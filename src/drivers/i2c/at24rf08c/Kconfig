@@ -1,0 +1,6 @@
+## SPDX-License-Identifier: GPL-2.0-only
+
+config DRIVER_LENOVO_SERIALS
+	bool
+	default y if VENDOR_LENOVO
+	select SMBIOS_PROVIDED_BY_MOBO

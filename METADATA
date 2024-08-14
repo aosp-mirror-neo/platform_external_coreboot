@@ -1,0 +1,19 @@
+name: "coreboot"
+description:
+    "coreboot is an extended firmware platform that delivers a lightning fast "
+    "and secure boot experience on modern computers and embedded systems. As an "
+    "Open Source project it provides auditability and maximum control over "
+    "technology."
+
+third_party {
+homepage: "https://www.coreboot.org/"
+  identifier {
+    type: "Git"
+    value: "https://review.coreboot.org/coreboot.git"
+    primary_source: true
+    version: "408b409c2df25c2eb8381c459f500490d9755a28"
+  }
+  version: "408b409c2df25c2eb8381c459f500490d9755a28"
+  last_upgrade_date { year: 2024 month: 8 day: 6 }
+  license_type: RESTRICTED
+}
