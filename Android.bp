@@ -138,8 +138,6 @@ cc_binary {
         "util/cbfstool/lzma/C/LzFind.c",
         "util/cbfstool/lzma/C/LzmaDec.c",
         "util/cbfstool/lzma/C/LzmaEnc.c",
-
-        ":fmd_shipped_sources",
     ],
     generated_headers: ["fmd_shipped_headers"],
 }
