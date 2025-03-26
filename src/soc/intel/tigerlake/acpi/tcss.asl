@@ -321,7 +321,7 @@ Scope (_GPE)
 	}
 }
 
-Scope (\_SB.PCI0)
+Scope (\_SB)
 {
 	Device (IOM)
 	{
@@ -331,9 +331,18 @@ Scope (\_SB.PCI0)
 		Name (_CRS, ResourceTemplate () {
 			Memory32Fixed (ReadWrite, IOM_BASE_ADDRESS, IOM_BASE_SIZE)
 		})
+#if CONFIG(IOM_ACPI_DEVICE_VISIBLE)
+		/* ACPI_STATUS_DEVICE_ALL_ON */
 		Name (_STA, 0xF)
+#else
+		/* ACPI_STATUS_DEVICE_HIDDEN_ON */
+		Name (_STA, 0xB)
+#endif
 	}
+}
 
+Scope (\_SB.PCI0)
+{
 	/*
 	 * Operation region defined to access the TCSS_DEVEN. Get the MCHBAR in offset
 	 * 0x48 in B0:D0:F0. TCSS device enable base address is in offset 0x7090 of MCHBAR.

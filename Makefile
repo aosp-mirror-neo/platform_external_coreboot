@@ -88,21 +88,21 @@ all: real-all
 help_coreboot help::
 	@echo  '*** coreboot platform targets ***'
 	@echo  '  Use "make [target] V=1" for extra build debug information'
-	@echo  '  all                   - Build coreboot'
-	@echo  '  clean                 - Remove coreboot build artifacts'
-	@echo  '  distclean             - Remove build artifacts and config files'
-	@echo  '  sphinx                - Build sphinx documentation for coreboot'
-	@echo  '  sphinx-lint           - Build sphinx documentation for coreboot with warnings as errors'
-	@echo  '  filelist              - Show files used in current build'
-	@echo  '  printall              - Print makefile info for debugging'
-	@echo  '  gitconfig             - Set up git to submit patches to coreboot'
-	@echo  '  ctags / ctags-project - Make ctags file for all of coreboot or current board'
+	@echo  '  all                     - Build coreboot'
+	@echo  '  clean                   - Remove coreboot build artifacts'
+	@echo  '  distclean               - Remove build artifacts and config files'
+	@echo  '  sphinx                  - Build sphinx documentation for coreboot'
+	@echo  '  sphinx-lint             - Build sphinx documentation for coreboot with warnings as errors'
+	@echo  '  filelist                - Show files used in current build'
+	@echo  '  printall                - Print makefile info for debugging'
+	@echo  '  gitconfig               - Set up git to submit patches to coreboot'
+	@echo  '  ctags / ctags-project   - Make ctags file for all of coreboot or current board'
 	@echo  '  cscope / cscope-project - Make cscope.out file for coreboot or current board'
 	@echo
 	@echo  '*** site-local related targets ***'
-	@echo  '  symlink               - Create symbolic links from site-local into coreboot tree'
-	@echo  '  clean-symlink         - Remove symbolic links created by "make symlink"'
-	@echo  '  cleanall-symlink      - Remove all symbolic links in the coreboot tree'
+	@echo  '  symlink                 - Create symbolic links from site-local into coreboot tree'
+	@echo  '  clean-symlink           - Remove symbolic links created by "make symlink"'
+	@echo  '  cleanall-symlink        - Remove all symbolic links in the coreboot tree'
 	@echo
 
 # This include must come _before_ the pattern rules below!
@@ -228,6 +228,12 @@ real-all: site-local-target real-target
 .SECONDARY:
 .SECONDEXPANSION:
 .DELETE_ON_ERROR:
+
+# conf is treated as an intermediate target and may be built after config.h
+# during a clean build due to the way GNU Make handles intermediates when the
+# .SECONDARY target is present, forcing config.h and thus every object out of
+# date on a subsequent no-op build. Mark it as not intermediate to prevent this
+.NOTINTERMEDIATE: $(objutil)/kconfig/conf
 
 $(KCONFIG_AUTOHEADER): $(KCONFIG_CONFIG) $(objutil)/kconfig/conf
 	$(MAKE) olddefconfig
@@ -392,16 +398,17 @@ define create_cc_template
 # $2 source suffix (c, S, ld, ...)
 # $3 additional compiler flags
 # $4 additional dependencies
+# $5 generated header dependencies
 ifn$(EMPTY)def $(1)-objs_$(2)_template
 de$(EMPTY)fine $(1)-objs_$(2)_template
 ifn$(EMPTY)eq ($(filter ads adb,$(2)),)
-$$(call src-to-obj,$1,$$(1).$2): $$(1).$2 $$(call create_ada_deps,$1,$$(call src-to-ali,$1,$$(1).$2)) $(4)
+$$(call src-to-obj,$1,$$(1).$2): $$(1).$2 $$(call create_ada_deps,$1,$$(call src-to-ali,$1,$$(1).$2)) $(4) | $(5)
 	@printf "    GCC        $$$$(subst $$$$(obj)/,,$$$$(@))\n"
 	$(GCC_$(1)) \
 		$$$$(ADAFLAGS_$(1)) $$$$(addprefix -I,$$$$($(1)-ada-dirs)) \
 		$(3) -c -o $$$$@ $$$$<
 el$(EMPTY)se
-$$(call src-to-obj,$1,$$(1).$2): $$(1).$2 $(KCONFIG_AUTOHEADER) $(4)
+$$(call src-to-obj,$1,$$(1).$2): $$(1).$2 $(KCONFIG_AUTOHEADER) $(4) | $(5)
 	@printf "    CC         $$$$(subst $$$$(obj)/,,$$$$(@))\n"
 	$(CC_$(1)) \
 		-MMD $$$$(CPPFLAGS_$(1)) $$$$(CFLAGS_$(1)) -MT $$$$(@) \
@@ -416,7 +423,7 @@ $(foreach class,$(classes), \
 	$(foreach type,$(call filetypes-of-class,$(class)), \
 		$(eval $(class)-$(type)-ccopts += $(generic-$(type)-ccopts) $($(class)-generic-ccopts)) \
 		$(if $(generic-objs_$(type)_template_gen),$(eval $(call generic-objs_$(type)_template_gen,$(class))),\
-		$(eval $(call create_cc_template,$(class),$(type),$($(class)-$(type)-ccopts),$($(class)-$(type)-deps))))))
+		$(eval $(call create_cc_template,$(class),$(type),$($(class)-$(type)-ccopts),$($(class)-$(type)-deps),$($(class)-$(type)-gen-deps))))))
 
 foreach-src=$(foreach file,$($(1)-srcs),$(eval $(call $(1)-objs_$(subst .,,$(suffix $(file)))_template,$(basename $(file)))))
 $(eval $(foreach class,$(classes),$(call foreach-src,$(class))))
@@ -478,6 +485,9 @@ filelist: $(obj)/project_filelist.txt
 ctags-project: clean-ctags $(obj)/project_filelist.txt
 	cat $(obj)/project_filelist.txt | \
 	  xargs ctags -o tags
+
+ctags:
+	ctags -R
 
 cscope-project: clean-cscope $(obj)/project_filelist.txt
 	cat $(obj)/project_filelist.txt | xargs cscope -b

@@ -3,14 +3,49 @@
 #include <assert.h>
 #include <console/console.h>
 #include <cpu/intel/haswell/haswell.h>
+#include <delay.h>
 #include <device/pci_ops.h>
 #include <northbridge/intel/haswell/chip.h>
 #include <northbridge/intel/haswell/haswell.h>
 #include <northbridge/intel/haswell/raminit.h>
+#include <static.h>
 #include <string.h>
 #include <types.h>
 
 #include "raminit_native.h"
+
+static enum raminit_status pre_training(struct sysinfo *ctrl)
+{
+	/* Skip on S3 resume */
+	if (ctrl->bootmode == BOOTMODE_S3)
+		return RAMINIT_STATUS_SUCCESS;
+
+	for (uint8_t channel = 0; channel < NUM_CHANNELS; channel++) {
+		for (uint8_t slot = 0; slot < NUM_SLOTS; slot++) {
+			if (!rank_in_ch(ctrl, slot + slot, channel))
+				continue;
+
+			printk(RAM_DEBUG, "C%uS%u:\n", channel, slot);
+			printk(RAM_DEBUG, "\tMR0: 0x%04x\n", ctrl->mr0[channel][slot]);
+			printk(RAM_DEBUG, "\tMR1: 0x%04x\n", ctrl->mr1[channel][slot]);
+			printk(RAM_DEBUG, "\tMR2: 0x%04x\n", ctrl->mr2[channel][slot]);
+			printk(RAM_DEBUG, "\tMR3: 0x%04x\n", ctrl->mr3[channel][slot]);
+			printk(RAM_DEBUG, "\n");
+		}
+		if (ctrl->is_ecc) {
+			union mad_dimm_reg mad_dimm = {
+				.raw = mchbar_read32(MAD_DIMM(channel)),
+			};
+			/* Enable ECC I/O */
+			mad_dimm.ecc_mode = 1;
+			mchbar_write32(MAD_DIMM(channel), mad_dimm.raw);
+			/* Wait 4 usec after enabling the ECC I/O, needed by HW */
+			udelay(4);
+		}
+	}
+	setup_wdb(ctrl);
+	return RAMINIT_STATUS_SUCCESS;
+}
 
 struct task_entry {
 	enum raminit_status (*task)(struct sysinfo *);
@@ -19,7 +54,35 @@ struct task_entry {
 };
 
 static const struct task_entry cold_boot[] = {
-	{ collect_spd_info,           true, "PROCSPD",    },
+	{ collect_spd_info,                                       true, "PROCSPD",    },
+	{ initialise_mpll,                                        true, "INITMPLL",   },
+	{ convert_timings,                                        true, "CONVTIM",    },
+	{ configure_mc,                                           true, "CONFMC",     },
+	{ configure_memory_map,                                   true, "MEMMAP",     },
+	{ do_jedec_init,                                          true, "JEDECINIT",  },
+	{ pre_training,                                           true, "PRETRAIN",   },
+	{ train_sense_amp_offset,                                 true, "SOT",        },
+	{ train_receive_enable,                                   true, "RCVET",      },
+	{ train_read_mpr,                                         true, "RDMPRT",     },
+	{ train_jedec_write_leveling,                             true, "JWRL",       },
+	{ activate_mc,                                            true, "ACTIVATE",   },
+	{ save_training_values,                                   true, "SAVE_TRAIN", },
+	{ save_non_training,                                      true, "SAVE_NONT",  },
+	{ raminit_done,                                           true, "RAMINITEND", },
+};
+
+static const struct task_entry fast_boot[] = {
+	{ collect_spd_info,                                       true, "PROCSPD",    },
+	{ restore_non_training,                                   true, "RST_NONT",   },
+	{ initialise_mpll,                                        true, "INITMPLL",   },
+	{ configure_mc,                                           true, "CONFMC",     },
+	{ configure_memory_map,                                   true, "MEMMAP",     },
+	{ do_jedec_init,                                          true, "JEDECINIT",  },
+	{ pre_training,                                           true, "PRETRAIN",   },
+	{ restore_training_values,                                true, "RST_TRAIN",  },
+	{ exit_selfrefresh,                                       true, "EXIT_SR",    },
+	{ normal_state,                                           true, "NORMALMODE", },
+	{ raminit_done,                                           true, "RAMINITEND", },
 };
 
 /* Return a generic stepping value to make stepping checks simpler */
@@ -51,15 +114,17 @@ static void initialize_ctrl(struct sysinfo *ctrl)
 
 	ctrl->cpu = cpu_get_cpuid();
 	ctrl->stepping = get_stepping(ctrl->cpu);
+	ctrl->vdd_mv = is_hsw_ult() ? 1350 : 1500; /** FIXME: Hardcoded, does it matter? **/
 	ctrl->dq_pins_interleaved = cfg->dq_pins_interleaved;
+	ctrl->restore_mrs = false;
 	ctrl->bootmode = bootmode;
 }
 
-static enum raminit_status try_raminit(struct sysinfo *ctrl)
+static enum raminit_status try_raminit(
+	struct sysinfo *ctrl,
+	const struct task_entry *const schedule,
+	const size_t length)
 {
-	const struct task_entry *const schedule = cold_boot;
-	const size_t length = ARRAY_SIZE(cold_boot);
-
 	enum raminit_status status = RAMINIT_STATUS_UNSPECIFIED_ERROR;
 
 	for (size_t i = 0; i < length; i++) {
@@ -93,12 +158,17 @@ void raminit_main(const enum raminit_boot_mode bootmode)
 	mighty_ctrl.bootmode = bootmode;
 	initialize_ctrl(&mighty_ctrl);
 
+	enum raminit_status status = RAMINIT_STATUS_UNSPECIFIED_ERROR;
+
+	if (bootmode != BOOTMODE_COLD) {
+		status = try_raminit(&mighty_ctrl, fast_boot, ARRAY_SIZE(fast_boot));
+		if (status == RAMINIT_STATUS_SUCCESS)
+			return;
+	}
+
 	/** TODO: Try more than once **/
-	enum raminit_status status = try_raminit(&mighty_ctrl);
+	status = try_raminit(&mighty_ctrl, cold_boot, ARRAY_SIZE(cold_boot));
 
 	if (status != RAMINIT_STATUS_SUCCESS)
 		die("Memory initialization was met with utmost failure and misery\n");
-
-	/** TODO: Implement the required magic **/
-	die("NATIVE RAMINIT: More Magic (tm) required.\n");
 }

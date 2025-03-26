@@ -52,6 +52,15 @@ static inline u8 read_byte(u16 port)
 	return byte;
 }
 
+#if CONFIG(EC_GOOGLE_CHROMEEC_MEMMAP_INDEXED_IO)
+/* Read singe byte and return byte read using indexed IO*/
+static inline u8 read_byte_indexed_io(u8 offset)
+{
+	outb(offset, CONFIG_EC_GOOGLE_CHROMEEC_MEMMAP_INDEXED_IO_PORT);
+	return inb(CONFIG_EC_GOOGLE_CHROMEEC_MEMMAP_INDEXED_IO_PORT + 1);
+}
+#endif
+
 /*
  * Write bytes to a given LPC-mapped address.
  *
@@ -156,6 +165,10 @@ static int google_chromeec_command_version(void)
 		printk(BIOS_ERR, "Error reading memmap data.\n");
 		return -1;
 	}
+#elif CONFIG(EC_GOOGLE_CHROMEEC_MEMMAP_INDEXED_IO)
+	id1 = read_byte_indexed_io(EC_MEMMAP_ID);
+	id2 = read_byte_indexed_io(EC_MEMMAP_ID + 1);
+	flags = read_byte_indexed_io(EC_MEMMAP_HOST_CMD_FLAGS);
 #else
 	id1 = read_byte(EC_LPC_ADDR_MEMMAP + EC_MEMMAP_ID);
 	id2 = read_byte(EC_LPC_ADDR_MEMMAP + EC_MEMMAP_ID + 1);
@@ -358,7 +371,11 @@ static int google_chromeec_command_v1(struct chromeec_command *cec_command)
 /* Return the byte of EC switch states */
 uint8_t google_chromeec_get_switches(void)
 {
+#if CONFIG(EC_GOOGLE_CHROMEEC_MEMMAP_INDEXED_IO)
+	return read_byte_indexed_io(EC_MEMMAP_SWITCHES);
+#else
 	return read_byte(EC_LPC_ADDR_MEMMAP + EC_MEMMAP_SWITCHES);
+#endif
 }
 
 void google_chromeec_ioport_range(uint16_t *out_base, size_t *out_size)
@@ -384,17 +401,36 @@ void google_chromeec_ioport_range(uint16_t *out_base, size_t *out_size)
 int google_chromeec_command(struct chromeec_command *cec_command)
 {
 	static int command_version;
+	struct stopwatch sw;
+	uint16_t cmd_code;
+	int result = -1;
 
 	if (command_version <= 0)
 		command_version = google_chromeec_command_version();
 
+	if (CONFIG(EC_GOOGLE_CHROMEEC_EC_HOST_CMD_DEBUG)) {
+		cmd_code = cec_command->cmd_code;
+		stopwatch_init(&sw);
+	}
+
 	switch (command_version) {
 	case EC_HOST_CMD_FLAG_VERSION_3:
-		return google_chromeec_command_v3(cec_command);
+		result = google_chromeec_command_v3(cec_command);
+		break;
 	case EC_HOST_CMD_FLAG_LPC_ARGS_SUPPORTED:
-		return google_chromeec_command_v1(cec_command);
+		result = google_chromeec_command_v1(cec_command);
+		break;
 	}
-	return -1;
+
+	if (CONFIG(EC_GOOGLE_CHROMEEC_EC_HOST_CMD_DEBUG)) {
+		stopwatch_tick(&sw);
+		printk(BIOS_DEBUG, "EC HOST CMD end Duration: %llu us, Command: 0x%x, Version: 0x%x\n",
+				stopwatch_duration_usecs(&sw),
+				cmd_code,
+				command_version);
+	}
+
+	return result;
 }
 
 static void lpc_ec_init(struct device *dev)

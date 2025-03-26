@@ -1,13 +1,13 @@
 chip soc/intel/skylake
 
 	# Enable deep Sx states
-	register "deep_s3_enable_ac" = "0"
-	register "deep_s3_enable_dc" = "0"
-	register "deep_s5_enable_ac" = "1"
-	register "deep_s5_enable_dc" = "1"
+	register "deep_s3_enable_ac" = "false"
+	register "deep_s3_enable_dc" = "false"
+	register "deep_s5_enable_ac" = "true"
+	register "deep_s5_enable_dc" = "true"
 	register "deep_sx_config" = "DSX_EN_WAKE_PIN"
 
-	register "eist_enable" = "1"
+	register "eist_enable" = "true"
 
 	# Set the Thermal Control Circuit (TCC) activation value to 95C
 	# even though FSP integration guide says to set it to 100C for SKL-U
@@ -24,10 +24,10 @@ chip soc/intel/skylake
 	register "gpe0_dw2" = "GPP_E"
 
 	# Disable DPTF
-	register "dptf_enable" = "0"
+	register "dptf_enable" = "false"
 
 	# FSP Configuration
-	register "DspEnable" = "1"
+	register "DspEnable" = "true"
 	register "IoBufferOwnership" = "0"
 	register "SkipExtGfxScan" = "1"
 	register "SaGv" = "SaGv_Enabled"
@@ -165,11 +165,11 @@ chip soc/intel/skylake
 			register "PcieRpClkSrcNumber[9]"  = "3"
 		end
 		device ref pcie_rp11	on
-			register "PcieRpEnable[10]" = "1"
+			register "PcieRpEnable[10]" = "true"
 			register "PcieRpClkSrcNumber[10]" = "3"
 		end
 		device ref pcie_rp12	on
-			register "PcieRpEnable[11]" = "1"
+			register "PcieRpEnable[11]" = "true"
 			register "PcieRpClkSrcNumber[11]" = "3"
 		end
 		device ref lpc_espi	on

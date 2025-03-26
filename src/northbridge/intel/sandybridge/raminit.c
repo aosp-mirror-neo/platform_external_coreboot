@@ -15,6 +15,7 @@
 #include <mrc_cache.h>
 #include <southbridge/intel/bd82x6x/me.h>
 #include <southbridge/intel/bd82x6x/pch.h>
+#include <static.h>
 #include <cpu/x86/msr.h>
 #include <types.h>
 
@@ -340,7 +341,7 @@ static void init_dram_ddr3(int s3resume, const u32 cpuid)
 	int me_uma_size, cbmem_was_inited, fast_boot, err;
 	ramctr_timing ctrl;
 	spd_ddr3_raw_data spds[4];
-	size_t mrc_size;
+	size_t mrc_size = 0;
 	ramctr_timing *ctrl_cached = NULL;
 
 	timestamp_add_now(TS_INITRAM_START);

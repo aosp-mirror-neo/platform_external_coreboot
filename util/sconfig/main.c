@@ -581,6 +581,11 @@ void add_fw_config_probe(struct bus *bus, const char *field, const char *option)
 	append_fw_config_probe_to_dev(bus->dev, probe);
 }
 
+void probe_unprovisioned_fw_config(struct bus *bus)
+{
+	bus->dev->enable_on_unprovisioned_fw_config = true;
+}
+
 static uint64_t compute_fw_config_mask(const struct fw_config_field_bits *bits)
 {
 	uint64_t mask = 0;
@@ -859,7 +864,7 @@ static struct device *new_device_with_path(struct bus *parent,
 		break;
 
 	case DOMAIN:
-		new_d->path = ".type=DEVICE_PATH_DOMAIN,{.domain={ .domain = 0x%x }}";
+		new_d->path = ".type=DEVICE_PATH_DOMAIN,{.domain={ .domain_id = 0x%x }}";
 		break;
 
 	case GENERIC:
@@ -1260,6 +1265,8 @@ static void pass1(FILE *fil, FILE *head, struct device *ptr, struct device *next
 		fprintf(fil, "\t.sibling = NULL,\n");
 	if (ptr->probe)
 		fprintf(fil, "\t.probe_list = %s_probe_list,\n", ptr->name);
+	fprintf(fil, "\t.enable_on_unprovisioned_fw_config = %d,\n",
+		ptr->enable_on_unprovisioned_fw_config);
 	fprintf(fil, "#if !DEVTREE_EARLY\n");
 	fprintf(fil, "\t.chip_ops = &%s_ops,\n",
 		chip_ins->chip->name_underscore);
@@ -1783,6 +1790,8 @@ static void update_device(struct device *base_dev, struct device *override_dev)
 	 * to allow an override to remove a probe from the base device.
 	 */
 	base_dev->probe = override_dev->probe;
+	base_dev->enable_on_unprovisioned_fw_config =
+		override_dev->enable_on_unprovisioned_fw_config;
 
 	/* Copy SMBIOS slot information from base device */
 	base_dev->smbios_slot_type = override_dev->smbios_slot_type;
@@ -1895,6 +1904,17 @@ static void generate_outputh(FILE *f, const char *fw_conf_header, const char *de
 
 	fprintf(f, "#include <%s>\n", fw_conf_header);
 	fprintf(f, "#include <%s>\n\n", device_header);
+
+	fprintf(f, "/* Returns pointer to config structure of root device (B:D:F = 0:00:0) */\n");
+	fprintf(f, "#define config_of_soc() __pci_0_00_0_config\n\n");
+
+	fprintf(f, "/* Macro to generate `struct device *` name that points to a device with the given alias. */\n");
+	fprintf(f, "#define DEV_PTR(_alias) \t_dev_##_alias##_ptr\n\n");
+
+	fprintf(f, "/* Macro to generate weak `struct device *` definition that points to a device with the given\n");
+	fprintf(f, "   alias. */\n");
+	fprintf(f, "#define WEAK_DEV_PTR(_alias)\t\t\t\\\n");
+	fprintf(f, "\t__weak DEVTREE_CONST struct device *const DEV_PTR(_alias)\n");
 
 	fprintf(f, "\n#endif /* __STATIC_DEVICE_TREE_H */\n");
 }

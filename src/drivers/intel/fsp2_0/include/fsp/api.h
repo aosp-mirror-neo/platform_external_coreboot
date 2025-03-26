@@ -50,6 +50,25 @@ void platform_fsp_silicon_init_params_cb(FSPS_UPD *supd);
 /* Callbacks for SoC/Mainboard specific overrides */
 void platform_fsp_memory_multi_phase_init_cb(uint32_t phase_index);
 void platform_fsp_silicon_multi_phase_init_cb(uint32_t phase_index);
+/*
+ * Displays an early shutdown notification to the user.
+ *
+ * This function is responsible to perform the needful operations for informing
+ * the user that the system is about to shut down prematurely. The implementation
+ * might be different depending upon the underlying technology that can be used for
+ * implementing eSOL for user notification.
+ *
+ * Argument: NULL for platform with libgfxinit and FSP-M UPD pointer for uGOP.
+ *
+ * Note: This function should be called before the actual shutdown process begins,
+ * allowing the user to potentially save data or take other necessary actions.
+ */
+#if CONFIG(PLATFORM_HAS_EARLY_LOW_BATTERY_INDICATOR)
+void platform_display_early_shutdown_notification(void *arg);
+#else
+static inline void platform_display_early_shutdown_notification(void *arg) { /* nop */ }
+#endif
+
 /* Check if MultiPhase Si Init is enabled */
 bool fsp_is_multi_phase_init_enabled(void);
 /*

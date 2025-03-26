@@ -237,10 +237,7 @@ struct soc_intel_cannonlake_config {
 	/* Enables support for Teton Glacier hybrid storage device */
 	bool TetonGlacierMode;
 
-	/* Enable/Disable EIST. 1b:Enabled, 0b:Disabled */
 	bool eist_enable;
-
-	/* Enable C6 DRAM */
 	bool enable_c6dram;
 
 	/*
@@ -411,6 +408,12 @@ struct soc_intel_cannonlake_config {
 #if !CONFIG(SOC_INTEL_COMETLAKE)
 	uint32_t VrPowerDeliveryDesign;
 #endif
+
+	/* CNVi BT Core Enable/Disable */
+	bool CnviBtCore;
+
+	/* CNVi BT Audio Offload: Enable/Disable BT Audio Offload. */
+	bool CnviBtAudioOffload;
 
 	/*
 	 * Override GPIO PM configuration:

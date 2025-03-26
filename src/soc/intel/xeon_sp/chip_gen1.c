@@ -2,7 +2,6 @@
 
 #include <acpi/acpigen_pci.h>
 #include <assert.h>
-#include <console/console.h>
 #include <device/pci.h>
 #include <device/pci_ids.h>
 #include <soc/pci_devs.h>
@@ -17,7 +16,7 @@ static const STACK_RES *domain_to_stack_res(const struct device *dev)
 {
 	assert(dev->path.type == DEVICE_PATH_DOMAIN);
 	const union xeon_domain_path dn = {
-		.domain_path = dev->path.domain.domain
+		.domain_path = dev_get_domain_id(dev)
 	};
 
 	const IIO_UDS *hob = get_iio_uds();
@@ -29,6 +28,7 @@ static const STACK_RES *domain_to_stack_res(const struct device *dev)
 static void iio_pci_domain_read_resources(struct device *dev)
 {
 	const STACK_RES *sr = domain_to_stack_res(dev);
+	struct device *vtd_dev;
 
 	if (!sr)
 		return;
@@ -57,7 +57,10 @@ static void iio_pci_domain_read_resources(struct device *dev)
 				sr->PciResourceMem64Base, sr->PciResourceMem64Limit + 1);
 
 	/* Declare domain reserved MMIO */
-	uint64_t reserved_mmio = sr->VtdBarAddress + vtd_probe_bar_size(pcidev_on_root(0, 0));
+	vtd_dev = pcidev_on_root(VTD_DEV_NUM, VTD_FUNC_NUM);
+	assert(vtd_dev);
+
+	uint64_t reserved_mmio = sr->VtdBarAddress + vtd_probe_bar_size(vtd_dev);
 	if ((reserved_mmio >= sr->PciResourceMem32Base) &&
 	    (reserved_mmio <= sr->PciResourceMem32Limit))
 		mmio_range(dev, index++, reserved_mmio,
@@ -180,29 +183,4 @@ void create_xeonsp_domains(const union xeon_domain_path dp, struct bus *bus,
 		create_pcie_domains(dp, bus, sr, pci_segment_group);
 	else if (CONFIG(HAVE_IOAT_DOMAINS) && is_ioat_iio_stack_res(sr))
 		create_ioat_domains(dp, bus, sr, pci_segment_group);
-}
-
-/*
- * Route PAM segment access to DRAM
- * Only call this code from socket0!
- */
-void unlock_pam_regions(void)
-{
-	uint32_t pam0123_unlock_dram = 0x33333330;
-	uint32_t pam456_unlock_dram = 0x00333333;
-	/* Get UBOX(1) for socket0 */
-	uint32_t bus1 = socket0_get_ubox_busno(PCU_IIO_STACK);
-
-	/* Assume socket0 owns PCI segment 0 */
-	pci_io_write_config32(PCI_DEV(bus1, SAD_ALL_DEV, SAD_ALL_FUNC),
-		SAD_ALL_PAM0123_CSR, pam0123_unlock_dram);
-	pci_io_write_config32(PCI_DEV(bus1, SAD_ALL_DEV, SAD_ALL_FUNC),
-		SAD_ALL_PAM456_CSR, pam456_unlock_dram);
-
-	uint32_t reg1 = pci_io_read_config32(PCI_DEV(bus1, SAD_ALL_DEV,
-		SAD_ALL_FUNC), SAD_ALL_PAM0123_CSR);
-	uint32_t reg2 = pci_io_read_config32(PCI_DEV(bus1, SAD_ALL_DEV,
-		SAD_ALL_FUNC), SAD_ALL_PAM456_CSR);
-	printk(BIOS_DEBUG, "%s:%s pam0123_csr: 0x%x, pam456_csr: 0x%x\n",
-		__FILE__, __func__, reg1, reg2);
 }

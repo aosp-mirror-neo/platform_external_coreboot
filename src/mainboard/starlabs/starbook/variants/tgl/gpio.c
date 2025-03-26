@@ -90,7 +90,7 @@ const struct pad_config gpio_table[] = {
 	/* A22:	Not Connected			*/
 	PAD_NC(GPP_A22, NONE),
 	/* A23:	TC_RETIMER_FORCE_PWR		*/
-	PAD_CFG_GPO(GPP_A23, 0, PLTRST),
+	PAD_CFG_GPO(GPP_A23, 0, DEEP),
 
 	/* B0:	CORE_VID_0			*/
 	PAD_CFG_NF(GPP_B0, NONE, DEEP, NF1),
@@ -219,7 +219,7 @@ const struct pad_config gpio_table[] = {
 	/* D15:	Not Connected			*/
 	PAD_NC(GPP_D15, NONE),
 	/* D16:	CPU_SSD_PWREN			*/
-	PAD_CFG_GPO(GPP_D16, 1, PLTRST),
+	PAD_CFG_GPO(GPP_D16, 1, DEEP),
 	/* D17:	Not Connected			*/
 	PAD_NC(GPP_D17, NONE),
 	/* D18:	Not Connected			*/

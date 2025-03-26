@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 
 #include <arch/null_breakpoint.h>
+#include <arch/stack_canary_breakpoint.h>
 #include <bootsplash.h>
 #include <bootstate.h>
 #include <cbfs.h>
@@ -13,7 +14,12 @@
 #include <mrc_cache.h>
 #include <program_loading.h>
 #include <soc/intel/common/reset.h>
+#if CONFIG(SOC_AMD_COMMON)
+#include <amdblocks/vbt.h>
+#endif
+#if CONFIG(SOC_INTEL_COMMON)
 #include <soc/intel/common/vbt.h>
+#endif
 #include <stage_cache.h>
 #include <string.h>
 #include <timestamp.h>
@@ -131,12 +137,14 @@ static void do_silicon_init(struct fsp_header *hdr)
 	post_code(POSTCODE_FSP_SILICON_INIT);
 
 	/* FSP disables the interrupt handler so remove debug exceptions temporarily  */
-	null_breakpoint_disable();
+	null_breakpoint_remove();
+	stack_canary_breakpoint_remove();
 	if (ENV_X86_64 && CONFIG(PLATFORM_USES_FSP2_X86_32))
 		status = protected_mode_call_1arg(silicon_init, (uintptr_t)upd);
 	else
 		status = silicon_init(upd);
 	null_breakpoint_init();
+	stack_canary_breakpoint_init();
 
 	fsp_printk(status, BIOS_INFO, "FSPS");
 
@@ -250,6 +258,9 @@ void fsp_silicon_init(void)
 {
 	fsps_load();
 	do_silicon_init(&fsps_hdr);
+
+	if (platform_is_low_battery_shutdown_needed())
+		do_low_battery_poweroff();
 
 	if (CONFIG(CACHE_MRC_SETTINGS) && CONFIG(FSP_NVS_DATA_POST_SILICON_INIT))
 		save_memory_training_data();

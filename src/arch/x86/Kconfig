@@ -5,7 +5,6 @@ config ARCH_X86
 	select PCI
 	select RELOCATABLE_MODULES
 	select HAVE_ASAN_IN_RAMSTAGE
-	select ARCH_SUPPORTS_CLANG
 
 if ARCH_X86
 
@@ -369,13 +368,20 @@ config DEBUG_NULL_DEREF_BREAKPOINTS_IN_ALL_STAGES
 	default y
 	depends on DEBUG_NULL_DEREF_BREAKPOINTS && DEBUG_HW_BREAKPOINTS_IN_ALL_STAGES
 
-config DEBUG_NULL_DEREF_HALT
+config DEBUG_STACK_OVERFLOW_BREAKPOINTS
+	bool
+	default y
+	depends on DEBUG_HW_BREAKPOINTS
+	help
+	  Enable support for catching stack overflows
+
+config DEBUG_STACK_OVERFLOW_BREAKPOINTS_IN_ALL_STAGES
 	bool
 	default n
-	depends on DEBUG_NULL_DEREF_BREAKPOINTS
+	depends on DEBUG_STACK_OVERFLOW_BREAKPOINTS && DEBUG_HW_BREAKPOINTS_IN_ALL_STAGES
 	help
-	  When enabled null dereferences and instruction fetches will halt execution.
-	  Otherwise an error will be printed.
+	  Disabled as false-positive stack corruptions where observed on some platforms.
+	  TODO: Investigate those reported errors before defaulting to yes.
 
 # Some EC need an "EC firmware pointer" (a data structure hinting the address
 # of its firmware blobs) being put at a fixed position. Its space
@@ -423,4 +429,28 @@ config X86_BOOTBLOCK_EXTRA_PROGRAM_SZ
 
 	  The default value is 1024 bytes (1 KiB) for ChromeOS and 0 for other platforms.
 
+config DEFAULT_EBDA_LOWMEM
+	hex
+	default 0x100000
+	help
+	  The default value of EBDA low memory is (1024 << 10).
+
+config DEFAULT_EBDA_SEGMENT
+	hex
+	default 0xF600
+	help
+	  The default value of EBDA segment is 0xF600.
+
+config DEFAULT_EBDA_SIZE
+	hex
+	default 0x400
+	help
+	  The default value of EBDA size is 0x400.
+
+config SHADOW_ROM_TABLE_TO_EBDA
+	bool
+	default n
+	help
+	  For platforms without writable PAM-F segment support. Put ROM table
+	  pointers (e.g. ACPI/SMBIOS low pointers) into EBDA.
 endif

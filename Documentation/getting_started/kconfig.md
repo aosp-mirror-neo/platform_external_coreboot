@@ -11,12 +11,8 @@ configuration front end in coreboot today.
 
 The official Kconfig source and documentation is kept at kernel.org:
 
-```{toctree}
-:maxdepth: 1
-
-Kconfig source <https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/scripts/kconfig>
-Kconfig Language Documentation <https://www.kernel.org/doc/Documentation/kbuild/kconfig-language.txt>
-```
+- [Kconfig source](https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/scripts/kconfig)
+- [Kconfig Language Documentation](https://www.kernel.org/doc/Documentation/kbuild/kconfig-language.txt)
 
 The advantage to using Kconfig is that it allows users to easily select the
 high level features of the project to be enabled or disabled at build time.
@@ -1176,13 +1172,13 @@ vim-common), but most editors do not.
 
 ### ultraedit:
 
-https://github.com/martinlroth/wordfiles/blob/master/kconfig.uew
+<https://github.com/martinlroth/wordfiles/blob/master/kconfig.uew>
 
 
 
 ### atom:
 
-https://github.com/martinlroth/language-kconfig
+<https://github.com/martinlroth/language-kconfig>
 
 
 ## Syntax Checking:
@@ -1221,7 +1217,7 @@ in.
 ## License:
 This work is licensed under the Creative Commons Attribution 4.0 International
 License. To view a copy of this license, visit
-https://creativecommons.org/licenses/by/4.0/ or send a letter to Creative
+<https://creativecommons.org/licenses/by/4.0/> or send a letter to Creative
 Commons, PO Box 1866, Mountain View, CA 94042, USA.
 
 Code examples snippets are licensed under GPLv2, and are used here under fair

@@ -1,19 +1,21 @@
-name: "coreboot"
-description:
-    "coreboot is an extended firmware platform that delivers a lightning fast "
-    "and secure boot experience on modern computers and embedded systems. As an "
-    "Open Source project it provides auditability and maximum control over "
-    "technology."
+# This project was upgraded with external_updater.
+# Usage: tools/external_updater/updater.sh update external/coreboot
+# For more info, check https://cs.android.com/android/platform/superproject/main/+/main:tools/external_updater/README.md
 
+name: "coreboot"
+description: "coreboot is an extended firmware platform that delivers a lightning fast and secure boot experience on modern computers and embedded systems. As an Open Source project it provides auditability and maximum control over technology."
 third_party {
-homepage: "https://www.coreboot.org/"
+  license_type: RESTRICTED
+  last_upgrade_date {
+    year: 2025
+    month: 3
+    day: 26
+  }
+  homepage: "https://www.coreboot.org/"
   identifier {
     type: "Git"
     value: "https://review.coreboot.org/coreboot.git"
+    version: "231296b6384a5c53c656f8e397945f664d634dc8"
     primary_source: true
-    version: "408b409c2df25c2eb8381c459f500490d9755a28"
   }
-  version: "408b409c2df25c2eb8381c459f500490d9755a28"
-  last_upgrade_date { year: 2024 month: 8 day: 6 }
-  license_type: RESTRICTED
 }

@@ -14,6 +14,7 @@
 #include <soc/pci_devs.h>
 #include <soc/ramstage.h>
 #include <soc/soc_chip.h>
+#include <static.h>
 #include <string.h>
 #include <types.h>
 
@@ -188,6 +189,10 @@ void platform_fsp_silicon_init_params_cb(FSPS_UPD *supd)
 
 	/* Provide correct UART number for FSP debug logs */
 	params->SerialIoDebugUartNumber = CONFIG_UART_FOR_CONSOLE;
+
+	/* PCIe Root Ports LTR mechanism */
+	for (i = 0; i < CONFIG_MAX_ROOT_PORTS; i++)
+		params->PcieRpLtrEnable[i] = config->PcieRpLtrEnable[i];
 
 	/* Configure FIVR RFI related settings */
 	params->FivrRfiFrequency = config->FivrRfiFrequency;

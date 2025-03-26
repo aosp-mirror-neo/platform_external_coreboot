@@ -129,6 +129,16 @@ int spi_flash_cmd(const struct spi_slave *spi, u8 cmd, void *response, size_t le
 	return ret;
 }
 
+int spi_flash_cmd_multi(const struct spi_slave *spi, const u8 *dout, size_t bytes_out,
+			void *din, size_t bytes_in)
+{
+	int ret = do_spi_flash_cmd(spi, dout, bytes_out, din, bytes_in);
+	if (ret)
+		printk(BIOS_WARNING, "SF: Failed to send command %02x: %d\n", dout[0], ret);
+
+	return ret;
+}
+
 /* TODO: This code is quite possibly broken and overflowing stacks. Fix ASAP! */
 #pragma GCC diagnostic push
 #if defined(__GNUC__) && !defined(__clang__)
@@ -559,6 +569,11 @@ int spi_flash_probe(unsigned int bus, unsigned int cs, struct spi_flash *flash)
 		spi_flash_cmd(&flash->spi, CMD_EXIT_4BYTE_ADDR_MODE, NULL, 0);
 	}
 
+	/* TODO: only do this in stages that will need to call those functions? */
+	if (CONFIG(SPI_FLASH_RPMC)) {
+		spi_flash_fill_rpmc_caps(flash);
+	}
+
 	return 0;
 }
 
@@ -610,12 +625,12 @@ int spi_flash_status(const struct spi_flash *flash, u8 *reg)
 int spi_flash_is_write_protected(const struct spi_flash *flash,
 				 const struct region *region)
 {
-	struct region flash_region = { 0 };
+	struct region flash_region;
 
 	if (!flash || !region)
 		return -1;
 
-	flash_region.size = flash->size;
+	flash_region = region_create(0, flash->size);
 
 	if (!region_is_subregion(&flash_region, region))
 		return -1;
@@ -633,13 +648,13 @@ int spi_flash_set_write_protected(const struct spi_flash *flash,
 				  const struct region *region,
 				  const enum spi_flash_status_reg_lockdown mode)
 {
-	struct region flash_region = { 0 };
+	struct region flash_region;
 	int ret;
 
 	if (!flash)
 		return -1;
 
-	flash_region.size = flash->size;
+	flash_region = region_create(0, flash->size);
 
 	if (!region_is_subregion(&flash_region, region))
 		return -1;
@@ -755,12 +770,12 @@ int spi_flash_ctrlr_protect_region(const struct spi_flash *flash,
 				   const enum ctrlr_prot_type type)
 {
 	const struct spi_ctrlr *ctrlr;
-	struct region flash_region = { 0 };
+	struct region flash_region;
 
 	if (!flash)
 		return -1;
 
-	flash_region.size = flash->size;
+	flash_region = region_create(0, flash->size);
 
 	if (!region_is_subregion(&flash_region, region))
 		return -1;

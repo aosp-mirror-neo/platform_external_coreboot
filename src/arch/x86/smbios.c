@@ -52,16 +52,16 @@ static int get_socket_type(void)
 		return PROCESSOR_UPGRADE_SOCKET_MPGA604;
 	if (CONFIG(CPU_INTEL_SOCKET_LGA775))
 		return PROCESSOR_UPGRADE_SOCKET_LGA775;
-	if (CONFIG(SOC_INTEL_ALDERLAKE))
+	if (CONFIG(CPU_INTEL_SOCKET_LGA1700))
 		return PROCESSOR_UPGRADE_SOCKET_LGA1700;
-	if (CONFIG(SOC_INTEL_METEORLAKE))
-		return PROCESSOR_UPGRADE_OTHER;
-	if (CONFIG(SOC_INTEL_SKYLAKE_SP))
-		return PROCESSOR_UPGRADE_SOCKET_LGA3647_1;
-	if (CONFIG(SOC_INTEL_COOPERLAKE_SP))
+	if (CONFIG(CPU_INTEL_SOCKET_LGA4189))
 		return PROCESSOR_UPGRADE_SOCKET_LGA4189;
-	if (CONFIG(SOC_INTEL_SAPPHIRERAPIDS_SP))
+	if (CONFIG(CPU_INTEL_SOCKET_LGA4677))
 		return PROCESSOR_UPGRADE_SOCKET_LGA4677;
+	if (CONFIG(CPU_INTEL_SOCKET_LGA3647_1))
+		return PROCESSOR_UPGRADE_SOCKET_LGA3647_1;
+	if (CONFIG(CPU_INTEL_SOCKET_OTHER))
+		return PROCESSOR_UPGRADE_OTHER;
 
 	return PROCESSOR_UPGRADE_UNKNOWN;
 }
@@ -176,17 +176,40 @@ int smbios_write_type4(unsigned long *current, int handle)
 	if (cpu_have_cpuid()) {
 		res = cpuid(1);
 
+		if (((res.ebx >> 16) & 0xff) > 1)
+			characteristics |= PROCESSOR_MULTI_CORE;
+
 		if ((res.ecx) & BIT(5))
-			characteristics |= BIT(6); /* BIT6: Enhanced Virtualization */
+			characteristics |= PROCESSOR_ENHANCED_VIRTUALIZATION;
 
 		if ((res.edx) & BIT(28))
-			characteristics |= BIT(4); /* BIT4: Hardware Thread */
+			characteristics |= PROCESSOR_HARDWARE_THREAD;
+
+		if (CONFIG(SOC_INTEL_COMMON) && cpu_cpuid_extended_level() >= 6) {
+			res = cpuid(6);
+			if ((res.eax) & BIT(7)) /* Intel HWP*/
+				characteristics |= PROCESSOR_POWER_PERFORMANCE_CONTROL;
+		}
 
 		if (cpu_cpuid_extended_level() >= 0x80000001) {
 			res = cpuid(0x80000001);
 
 			if ((res.edx) & BIT(20))
-				characteristics |= BIT(5); /* BIT5: Execute Protection */
+				characteristics |= PROCESSOR_EXECUTE_PROTECTION;
+
+			if ((res.edx) & BIT(29))
+				characteristics |= PROCESSOR_64BIT_CAPABLE;
+
+			/* AMD SVM */
+			if (CONFIG(SOC_AMD_COMMON) && (res.ecx) & BIT(2))
+				characteristics |= PROCESSOR_ENHANCED_VIRTUALIZATION;
+		}
+
+		if (CONFIG(SOC_AMD_COMMON) && cpu_cpuid_extended_level() >= 0x80000007) {
+			res = cpuid(0x80000007);
+
+			if ((res.edx) & BIT(7)) /* Hardware P-state control */
+				characteristics |= PROCESSOR_POWER_PERFORMANCE_CONTROL;
 		}
 	}
 	t->processor_characteristics = characteristics | smbios_processor_characteristics();

@@ -27,8 +27,8 @@ chip soc/intel/meteorlake
 		[DDI_PORT_4] = DDI_ENABLE_HPD,
 	}"
 
-	# Temporary setting TCC of 105C = Tj max (110) - TCC_Offset (5)
-	register "tcc_offset" = "5"
+	# Temporary setting TCC of 98C = Tj max (110) - TCC_Offset (12)
+	register "tcc_offset" = "12"
 
 	register "power_limits_config[MTL_P_682_482_CORE]" = "{
 		.tdp_pl1_override = 33,
@@ -167,6 +167,13 @@ chip soc/intel/meteorlake
 				.clk_req = 7,
 				.flags = PCIE_RP_LTR | PCIE_RP_AER,
 			}"
+			chip soc/intel/common/block/pcie/rtd3
+				register "is_storage" = "true"
+				register "enable_gpio" = "ACPI_GPIO_OUTPUT_ACTIVE_HIGH(GPP_A19)"
+				register "reset_gpio" = "ACPI_GPIO_OUTPUT_ACTIVE_LOW(GPP_A20)"
+				register "srcclk_pin" = "7"
+				device generic 0 on end
+			end
 		end	# PCIE11 SSD card
 		device ref tbt_pcie_rp0 on end
 		device ref tbt_pcie_rp1 on end
@@ -209,11 +216,13 @@ chip soc/intel/meteorlake
 		device ref tcss_dma0 on
 			chip drivers/intel/usb4/retimer
 				register "dfp[0].power_gpio" = "ACPI_GPIO_OUTPUT_ACTIVE_HIGH(GPP_B22)"
+				register "dfp[0].ec_port" = "EC_TYPEC_PORT_0"
 				use tcss_usb3_port0 as dfp[0].typec_port
 				device generic 0 on end
 			end
 			chip drivers/intel/usb4/retimer
 				register "dfp[1].power_gpio" = "ACPI_GPIO_OUTPUT_ACTIVE_HIGH(GPP_B22)"
+				register "dfp[1].ec_port" = "EC_TYPEC_PORT_2"
 				use tcss_usb3_port1 as dfp[1].typec_port
 				device generic 0 on end
 			end
@@ -221,11 +230,13 @@ chip soc/intel/meteorlake
 		device ref tcss_dma1 on
 			chip drivers/intel/usb4/retimer
 				register "dfp[0].power_gpio" = "ACPI_GPIO_OUTPUT_ACTIVE_HIGH(GPP_B22)"
+				register "dfp[0].ec_port" = "EC_TYPEC_PORT_1"
 				use tcss_usb3_port2 as dfp[0].typec_port
 				device generic 0 on end
 			end
 			chip drivers/intel/usb4/retimer
 				register "dfp[1].power_gpio" = "ACPI_GPIO_OUTPUT_ACTIVE_HIGH(GPP_B22)"
+				register "dfp[1].ec_port" = "EC_TYPEC_PORT_3"
 				use tcss_usb3_port3 as dfp[1].typec_port
 				device generic 0 on end
 			end
@@ -325,7 +336,6 @@ chip soc/intel/meteorlake
 				register "wake" = "GPE0_PME_B0"
 				register "add_acpi_dma_property" = "true"
 				register "enable_cnvi_ddr_rfim" = "true"
-				use usb2_port10 as bluetooth_companion
 				device generic 0 on end
 			end
 		end

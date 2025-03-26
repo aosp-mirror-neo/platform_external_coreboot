@@ -72,8 +72,6 @@ static void each_cpu_init(struct device *cpu)
 	       __func__, dev_path(cpu), cpu_index(), cpu->path.apic.apic_id,
 	       cpu->path.apic.package_id);
 
-	/* Populate the node ID. It will be used as proximity ID. */
-	set_cpu_node_id_leaf_1f_b(cpu);
 	assert (cpu->path.apic.node_id < CONFIG_MAX_SOCKET);
 
 	/*
@@ -97,14 +95,18 @@ static void each_cpu_init(struct device *cpu)
 	wrmsr(MSR_VR_CURRENT_CONFIG, msr);
 
 	/* Set Turbo Ratio Limits */
-	msr.lo = chip_config->turbo_ratio_limit & 0xffffffff;
-	msr.hi = (chip_config->turbo_ratio_limit >> 32) & 0xffffffff;
-	wrmsr(MSR_TURBO_RATIO_LIMIT, msr);
+	if (chip_config->turbo_ratio_limit) {
+		msr.lo = chip_config->turbo_ratio_limit & 0xffffffff;
+		msr.hi = (chip_config->turbo_ratio_limit >> 32) & 0xffffffff;
+		wrmsr(MSR_TURBO_RATIO_LIMIT, msr);
+	}
 
 	/* Set Turbo Ratio Limit Cores */
-	msr.lo = chip_config->turbo_ratio_limit_cores & 0xffffffff;
-	msr.hi = (chip_config->turbo_ratio_limit_cores >> 32) & 0xffffffff;
-	wrmsr(MSR_TURBO_RATIO_LIMIT_CORES, msr);
+	if (chip_config->turbo_ratio_limit_cores) {
+		msr.lo = chip_config->turbo_ratio_limit_cores & 0xffffffff;
+		msr.hi = (chip_config->turbo_ratio_limit_cores >> 32) & 0xffffffff;
+		wrmsr(MSR_TURBO_RATIO_LIMIT_CORES, msr);
+	}
 
 	/* Set energy policy */
 	msr = rdmsr(MSR_ENERGY_PERF_BIAS_CONFIG);
@@ -220,21 +222,6 @@ static void pre_mp_init(void)
 	x86_mtrr_check();
 }
 
-static int get_thread_count(void)
-{
-	unsigned int num_phys = 0, num_virts = 0;
-
-	/*
-	 * This call calculates the thread count which is corresponding to num_virts
-	 * (logical cores), while num_phys is corresponding to physical cores (in SMT
-	 * system, one physical core has multiple threads, a.k.a. logical cores).
-	 * Hence num_phys is not actually used.
-	 */
-	cpu_read_topology(&num_phys, &num_virts);
-	printk(BIOS_SPEW, "Detected %u cores and %u threads\n", num_phys, num_virts);
-	return num_virts * soc_get_num_cpus();
-}
-
 static void post_mp_init(void)
 {
 	/* Set Max Ratio */
@@ -249,7 +236,7 @@ static void post_mp_init(void)
 
 static const struct mp_ops mp_ops = {
 	.pre_mp_init = pre_mp_init,
-	.get_cpu_count = get_thread_count,
+	.get_cpu_count = get_platform_thread_count,
 #if CONFIG(HAVE_SMI_HANDLER)
 	.get_smm_info = get_smm_info,
 	.pre_mp_smm_init = smm_southbridge_clear_state,

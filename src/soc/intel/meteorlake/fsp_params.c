@@ -9,12 +9,14 @@
 #include <cpu/intel/microcode.h>
 #include <device/device.h>
 #include <device/pci.h>
+#include <drivers/usb/acpi/chip.h>
 #include <fsp/api.h>
 #include <fsp/fsp_debug_event.h>
 #include <fsp/fsp_gop_blt.h>
 #include <fsp/ppi/mp_service_ppi.h>
 #include <fsp/util.h>
 #include <option.h>
+#include <intelblocks/aspm.h>
 #include <intelblocks/cse.h>
 #include <intelblocks/irq.h>
 #include <intelblocks/lpss.h>
@@ -31,6 +33,7 @@
 #include <soc/ramstage.h>
 #include <soc/soc_chip.h>
 #include <soc/soc_info.h>
+#include <static.h>
 #include <stdlib.h>
 #include <string.h>
 #include <types.h>
@@ -294,47 +297,6 @@ static const pci_devfn_t uart_dev[] = {
 	PCI_DEVFN_UART2
 };
 
-/*
- * Chip config parameter PcieRpL1Substates uses (UPD value + 1)
- * because UPD value of 0 for PcieRpL1Substates means disabled for FSP.
- * In order to ensure that mainboard setting does not disable L1 substates
- * incorrectly, chip config parameter values are offset by 1 with 0 meaning
- * use FSP UPD default. get_l1_substate_control() ensures that the right UPD
- * value is set in fsp_params.
- * 0: Use FSP UPD default
- * 1: Disable L1 substates
- * 2: Use L1.1
- * 3: Use L1.2 (FSP UPD default)
- */
-static int get_l1_substate_control(enum L1_substates_control ctl)
-{
-	if (CONFIG(SOC_INTEL_COMPLIANCE_TEST_MODE))
-		ctl = L1_SS_DISABLED;
-	else if ((ctl > L1_SS_L1_2) || (ctl == L1_SS_FSP_DEFAULT))
-		ctl = L1_SS_L1_2;
-	return ctl - 1;
-}
-
-/*
- * Chip config parameter pcie_rp_aspm uses (UPD value + 1) because
- * a UPD value of 0 for pcie_rp_aspm means disabled. In order to ensure
- * that the mainboard setting does not disable ASPM incorrectly, chip
- * config parameter values are offset by 1 with 0 meaning use FSP UPD default.
- * get_aspm_control() ensures that the right UPD value is set in fsp_params.
- * 0: Use FSP UPD default
- * 1: Disable ASPM
- * 2: L0s only
- * 3: L1 only
- * 4: L0s and L1
- * 5: Auto configuration
- */
-static unsigned int get_aspm_control(enum ASPM_control ctl)
-{
-	if ((ctl > ASPM_AUTO) || (ctl == ASPM_DEFAULT))
-		ctl = ASPM_AUTO;
-	return ctl - 1;
-}
-
 __weak void mainboard_update_soc_chip_config(struct soc_intel_meteorlake_config *config)
 {
 	/* Override settings per board. */
@@ -442,6 +404,8 @@ static void fill_fsps_tcss_params(FSP_S_CONFIG *s_cfg,
 		if (is_dev_enabled(tcss_port_arr[i]))
 			s_cfg->UsbTcPortEn |= BIT(i);
 	}
+
+	s_cfg->Usb4CmMode = CONFIG(SOFTWARE_CONNECTION_MANAGER);
 }
 
 static void fill_fsps_chipset_lockdown_params(FSP_S_CONFIG *s_cfg,
@@ -574,6 +538,23 @@ static void fill_fsps_lan_params(FSP_S_CONFIG *s_cfg,
 static void fill_fsps_cnvi_params(FSP_S_CONFIG *s_cfg,
 		const struct soc_intel_meteorlake_config *config)
 {
+	struct device *port = NULL;
+	struct drivers_usb_acpi_config *usb_cfg = NULL;
+	bool usb_audio_offload = false;
+
+	/* Search through the devicetree for matching USB devices */
+	while ((port = dev_find_path(port, DEVICE_PATH_USB)) != NULL) {
+		/* Skip ports that are not enabled or not of USB type */
+		if (!port->enabled || port->path.type != DEVICE_PATH_USB)
+			continue;
+
+		usb_cfg = port->chip_info;
+		if (usb_cfg && usb_cfg->cnvi_bt_audio_offload) {
+			usb_audio_offload = true;
+			break;
+		}
+	}
+
 	/* CNVi */
 	s_cfg->CnviMode = is_devfn_enabled(PCI_DEVFN_CNVI_WIFI);
 	s_cfg->CnviWifiCore = config->cnvi_wifi_core;
@@ -591,6 +572,13 @@ static void fill_fsps_cnvi_params(FSP_S_CONFIG *s_cfg,
 		printk(BIOS_ERR, "CNVi BT is enabled without CNVi being enabled\n");
 		s_cfg->CnviBtCore = 0;
 		s_cfg->CnviBtAudioOffload = 0;
+	}
+	if (s_cfg->CnviBtAudioOffload && !usb_audio_offload) {
+		printk(BIOS_WARNING, "CNVi BT Audio offload enabled but not in USB driver\n");
+	}
+	if (!s_cfg->CnviBtAudioOffload && usb_cfg && usb_audio_offload) {
+		printk(BIOS_ERR, "USB BT Audio offload enabled but CNVi BT offload disabled\n");
+		usb_cfg->cnvi_bt_audio_offload = 0;
 	}
 }
 
@@ -639,15 +627,12 @@ static void fill_fsps_pcie_params(FSP_S_CONFIG *s_cfg,
 		if (!(enable_mask & BIT(i)))
 			continue;
 		const struct pcie_rp_config *rp_cfg = &config->pcie_rp[i];
-		s_cfg->PcieRpL1Substates[i] =
-				get_l1_substate_control(rp_cfg->PcieRpL1Substates);
 		s_cfg->PcieRpLtrEnable[i] = !!(rp_cfg->flags & PCIE_RP_LTR);
 		s_cfg->PcieRpAdvancedErrorReporting[i] = !!(rp_cfg->flags & PCIE_RP_AER);
 		s_cfg->PcieRpHotPlug[i] = !!(rp_cfg->flags & PCIE_RP_HOTPLUG)
 				|| CONFIG(SOC_INTEL_COMPLIANCE_TEST_MODE);
 		s_cfg->PcieRpClkReqDetect[i] = !!(rp_cfg->flags & PCIE_RP_CLK_REQ_DETECT);
-		if (rp_cfg->pcie_rp_aspm)
-			s_cfg->PcieRpAspm[i] = get_aspm_control(rp_cfg->pcie_rp_aspm);
+		configure_pch_rp_power_management(s_cfg, rp_cfg, i);
 	}
 	s_cfg->PcieComplianceTestMode = CONFIG(SOC_INTEL_COMPLIANCE_TEST_MODE);
 }

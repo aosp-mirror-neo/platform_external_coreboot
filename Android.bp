@@ -68,7 +68,7 @@ cc_defaults {
 
 cc_defaults {
     name: "coreboot-tools-with-vboot-defaults",
-    defaults: [ "coreboot-tools-defaults" ],
+    defaults: ["coreboot-tools-defaults"],
     include_dirs: ["external/vboot_reference/host/lib/include"],
     static_libs: ["libvboot_host"],
 }
@@ -101,7 +101,7 @@ genrule {
 
 cc_binary {
     name: "cbfstool",
-    defaults: [ "coreboot-tools-with-vboot-defaults" ],
+    defaults: ["coreboot-tools-with-vboot-defaults"],
     host_supported: true,
     vendor: true,
     cflags: [
@@ -148,7 +148,7 @@ cc_binary {
 
 cc_binary {
     name: "elogtool",
-    defaults: [ "coreboot-tools-with-vboot-defaults" ],
+    defaults: ["coreboot-tools-with-vboot-defaults"],
     vendor: true,
     srcs: [
         "util/cbfstool/common.c",
@@ -177,11 +177,11 @@ cc_binary {
 }
 
 cc_binary {
-  name: "cbmem",
-  defaults: ["coreboot-tools-defaults"],
-  vendor: true,
-  srcs: [
-    "util/cbmem/cbmem.c",
-    "src/commonlib/bsd/ipchksum.c",
-  ],
+    name: "cbmem",
+    defaults: ["coreboot-tools-defaults"],
+    vendor: true,
+    srcs: [
+        "util/cbmem/cbmem.c",
+        "src/commonlib/bsd/ipchksum.c",
+    ],
 }

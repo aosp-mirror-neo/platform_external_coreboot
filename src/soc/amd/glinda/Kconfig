@@ -47,7 +47,8 @@ config SOC_AMD_GLINDA
 	select SOC_AMD_COMMON_BLOCK_DATA_FABRIC_MULTI_PCI_SEGMENT
 	select SOC_AMD_COMMON_BLOCK_ESPI_EXTENDED_DECODE_RANGES # TODO: Check if this is still correct
 	select SOC_AMD_COMMON_BLOCK_GPP_CLK
-	select SOC_AMD_COMMON_BLOCK_GRAPHICS		# TODO: Check if this is still correct
+	select SOC_AMD_COMMON_BLOCK_GRAPHICS
+	select SOC_AMD_COMMON_BLOCK_GRAPHICS_NO_VGA
 	select SOC_AMD_COMMON_BLOCK_HAS_ESPI		# TODO: Check if this is still correct
 	select SOC_AMD_COMMON_BLOCK_HAS_ESPI_ALERT_ENABLE # TODO: Check if this is still correct
 	select SOC_AMD_COMMON_BLOCK_I2C			# TODO: Check if this is still correct
@@ -89,6 +90,7 @@ config SOC_AMD_GLINDA
 	select VBOOT_DEFINE_WIDEVINE_COUNTERS if VBOOT_STARTS_BEFORE_BOOTBLOCK
 	select X86_AMD_FIXED_MTRRS
 	select X86_INIT_NEED_1_SIPI
+	select HAVE_X86_64_SUPPORT
 	help
 	  AMD Glinda support
 
@@ -121,7 +123,7 @@ config PSP_APOB_DRAM_ADDRESS
 
 config PSP_APOB_DRAM_SIZE
 	hex
-	default 0x1E000
+	default 0x40000
 
 config PSP_SHAREDMEM_BASE
 	hex
@@ -354,7 +356,7 @@ config PSP_WHITELIST_FILE
 
 config PSP_SOFTFUSE_BITS
 	string "PSP Soft Fuse bits to enable"
-	default "34 28 6"
+	default "6"
 	help
 	  Space separated list of Soft Fuse bits to enable.
 	  Bit 0:  Enable secure debug (Set by PSP_UNLOCK_SECURE_DEBUG)
@@ -379,6 +381,10 @@ config PSP_VERSTAGE_SIGNING_TOKEN
 	default ""
 	help
 	  Add psp_verstage signature token to the build & PSP Directory Table
+
+config PSPV2_MBOX_CMD_OFFSET
+	hex
+	default 0x10970
 
 endmenu
 

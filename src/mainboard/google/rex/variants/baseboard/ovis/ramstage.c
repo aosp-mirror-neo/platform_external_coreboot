@@ -6,6 +6,7 @@
 #include <device/pci_ops.h>
 #include <intelblocks/power_limit.h>
 #include <soc/pci_devs.h>
+#include <static.h>
 
 struct soc_power_limits_config *variant_get_soc_power_limit_config(void)
 {
@@ -40,6 +41,7 @@ const struct cpu_tdp_power_limits limits[] = {
 	{
 		.mch_id = PCI_DID_INTEL_MTL_P_ID_1,
 		.cpu_tdp = 28,
+		.power_limits_index = MTL_P_682_482_CORE,
 		.pl1_min_power = 19000,
 		.pl1_max_power = 28000,
 		.pl2_min_power = 64000,
@@ -49,6 +51,7 @@ const struct cpu_tdp_power_limits limits[] = {
 	{
 		.mch_id = PCI_DID_INTEL_MTL_P_ID_3,
 		.cpu_tdp = 28,
+		.power_limits_index = MTL_P_682_482_CORE,
 		.pl1_min_power = 19000,
 		.pl1_max_power = 28000,
 		.pl2_min_power = 64000,

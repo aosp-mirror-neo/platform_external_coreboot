@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 
 #include <acpi/acpigen_pci.h>
-#include <assert.h>
 #include <console/console.h>
 #include <device/pci.h>
 #include <intelblocks/acpi.h>
@@ -49,7 +48,7 @@ static int filter_device_on_stack(struct device *dev, uint8_t socket, uint8_t st
 		return 0;
 
 	union xeon_domain_path dn;
-	dn.domain_path = domain->path.domain.domain;
+	dn.domain_path = dev_get_domain_id(domain);
 
 	if (socket != XEONSP_SOCKET_MAX && dn.socket != socket)
 		return 0;
@@ -140,7 +139,7 @@ int iio_pci_domain_socket_from_dev(const struct device *dev)
 	if (!domain)
 		return -1;
 
-	dn.domain_path = domain->path.domain.domain;
+	dn.domain_path = dev_get_domain_id(domain);
 
 	return dn.socket;
 }
@@ -162,7 +161,7 @@ int iio_pci_domain_stack_from_dev(const struct device *dev)
 	if (!domain)
 		return -1;
 
-	dn.domain_path = domain->path.domain.domain;
+	dn.domain_path = dev_get_domain_id(domain);
 
 	return dn.stack;
 }
