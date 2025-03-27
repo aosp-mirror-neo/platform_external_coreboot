@@ -208,6 +208,45 @@ detect_special_flags() {
 	testcc "$GCC"      "$CFLAGS_GCC -Wcalloc-transposed-args" &&
 		CFLAGS_GCC="$CFLAGS_GCC -Wcalloc-transposed-args"
 
+	testcc "$GCC"      "$CFLAGS_GCC -Wno-unused-parameter" &&
+		CFLAGS_GCC="$CFLAGS_GCC -Wno-unused-parameter"
+
+	testcc "$GCC"      "$CFLAGS_GCC -Wno-sign-compare" &&
+		CFLAGS_GCC="$CFLAGS_GCC -Wno-sign-compare"
+
+	testcc "$GCC"      "$CFLAGS_GCC -Wno-empty-body" &&
+		CFLAGS_GCC="$CFLAGS_GCC -Wno-empty-body"
+
+	testcc "$GCC"      "$CFLAGS_GCC -Wno-missing-field-initializers" &&
+		CFLAGS_GCC="$CFLAGS_GCC -Wno-missing-field-initializers"
+
+	testcc "$GCC"      "$CFLAGS_GCC -Wno-override-init" &&
+		CFLAGS_GCC="$CFLAGS_GCC -Wno-override-init"
+
+	testcc "$GCC"      "$CFLAGS_GCC -Wno-ignored-qualifiers" &&
+		CFLAGS_GCC="$CFLAGS_GCC -Wno-ignored-qualifiers"
+
+	testcc "$GCC"      "$CFLAGS_GCC -Wno-shift-negative-value" &&
+		CFLAGS_GCC="$CFLAGS_GCC -Wno-shift-negative-value"
+
+	testcc "$GCC"      "$CFLAGS_GCC -Wno-unused-but-set-parameter" &&
+		CFLAGS_GCC="$CFLAGS_GCC -Wno-unused-but-set-parameter"
+
+	testcc "$GCC"      "$CFLAGS_GCC -Wno-type-limits" &&
+		CFLAGS_GCC="$CFLAGS_GCC -Wno-type-limits"
+
+	testcc "$GCC"      "$CFLAGS_GCC -Wno-cast-function-type" &&
+		CFLAGS_GCC="$CFLAGS_GCC -Wno-cast-function-type"
+
+	testcc "$GCC"      "$CFLAGS_GCC -Wextra" &&
+		CFLAGS_GCC="$CFLAGS_GCC -Wextra"
+
+	# Disable warning on segments with RWX.
+	# All loadable sections are placed in the same segment for simplicity.
+	testld "$GCC" "$FLAGS_GCC" "${GCCPREFIX}ld${LINKER_SUFFIX}" \
+		"$LDFLAGS --no-warn-rwx-segments" && \
+		LDFLAGS="$LDFLAGS --no-warn-rwx-segments"
+
 	case "$architecture" in
 	x86)
 		;;
@@ -217,6 +256,11 @@ detect_special_flags() {
 		testld "$GCC" "$FLAGS_GCC" "${GCCPREFIX}ld${LINKER_SUFFIX}" \
 		  "$LDFLAGS --fix-cortex-a53-843419" && \
 		  LDFLAGS_ARM64_A53_ERRATUM_843419+=" --fix-cortex-a53-843419"
+		  # https://bugs.llvm.org/show_bug.cgi?id=30792
+		  # LLVM/clang runs into problems when encountering SIMD registers in assembly
+		  # with -mgeneral-regs-only. -mno-implicit-float achieves the same though.
+		  CFLAGS_GCC="$CFLAGS_GCC -mgeneral-regs-only" &&
+		  CFLAGS_CLANG="$CFLAGS_CLANG -mno-implicit-float"
 		;;
 	riscv)
 		testcc "$GCC" "$FLAGS_GCC -march=rv64iadc_zicsr_zifencei" &&
@@ -415,7 +459,6 @@ arch_config_ppc64() {
 	TWIDTH="64"
 	TSUPP="ppc64"
 	TABI="linux-gnu" # there is no generic ABI on ppc64
-	CC_RT_EXTRA_GCC="-mcpu=power8 -mbig-endian"
 }
 
 # Right now, the clang reference toolchain is not building compiler-rt builtins

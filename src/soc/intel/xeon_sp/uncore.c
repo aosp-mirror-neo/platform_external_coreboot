@@ -4,8 +4,10 @@
 #include <cbmem.h>
 #include <console/console.h>
 #include <cpu/x86/lapic_def.h>
+#include <cpu/x86/mtrr.h>
 #include <device/pci.h>
 #include <device/pci_ids.h>
+#include <intelblocks/msr.h>
 #include <soc/acpi.h>
 #include <soc/chip_common.h>
 #include <soc/iomap.h>
@@ -54,7 +56,8 @@ enum {
 size_t vtd_probe_bar_size(struct device *dev)
 {
 	uint32_t id = pci_read_config32(dev, PCI_VENDOR_ID);
-	assert(id == (PCI_VID_INTEL | (MMAP_VTD_CFG_REG_DEVID << 16)));
+	assert((id == (PCI_VID_INTEL | (MMAP_VTD_CFG_REG_DEVID << 16))) ||
+	       (id == (PCI_VID_INTEL | (MMAP_VTD_STACK_CFG_REG_DEVID << 16))));
 
 	uint32_t val = pci_read_config32(dev, VTD_BAR_CSR);
 	pci_write_config32(dev, VTD_BAR_CSR, (uint32_t)(-4 * KiB));
@@ -151,6 +154,32 @@ static void configure_dpr(struct device *dev)
 	pci_write_config32(dev, VTD_LTDPR, dpr.raw);
 }
 
+#define MC_DRAM_RESOURCE_MMIO_HIGH	0x1000
+#define MC_DRAM_RESOURCE_ANON_START	0x1001
+
+__weak unsigned int get_prmrr_count(void)
+{
+	return 0x0;
+}
+
+static bool get_prmrr_region(unsigned int msr_addr, uint64_t *base, uint64_t *size)
+{
+	/* Check if processor supports PRMRR */
+	msr_t msr1 = rdmsr(MTRR_CAP_MSR);
+	if (!(msr1.lo & MTRR_CAP_PRMRR)) {
+		printk(BIOS_ERR, "%s(): PRMRR is not supported.\n", __func__);
+		return false;
+	}
+
+	/* Mask out bits 0-11 to get the base address */
+	*base = msr_read(msr_addr) & ~((1 << RANGE_SHIFT) - 1);
+
+	uint64_t mask = msr_read(MSR_PRMRR_PHYS_MASK);
+	*size = calculate_var_mtrr_size(mask);
+
+	return (*base && *size);
+}
+
 /*
  * Host Memory Map:
  *
@@ -240,7 +269,7 @@ static void mc_add_dram_resources(struct device *dev, int *res_count)
 
 	/* 1MB -> top_of_ram */
 	fsp_find_reserved_memory(&fsp_mem);
-	top_of_ram = range_entry_base(&fsp_mem) - 1;
+	top_of_ram = range_entry_base(&fsp_mem);
 	res = ram_from_to(dev, index++, 1 * MiB, top_of_ram);
 	LOG_RESOURCE("low_ram", dev, res);
 
@@ -281,21 +310,33 @@ static void mc_add_dram_resources(struct device *dev, int *res_count)
 				   mc_values[TOLM_REG]);
 	LOG_RESOURCE("mmio_tolm", dev, res);
 
-	if (CONFIG(SOC_INTEL_HAS_CXL)) {
-		/* 4GiB -> CXL Memory */
-		uint32_t gi_mem_size;
-		gi_mem_size = get_generic_initiator_mem_size(); /* unit: 64MB */
-		/*
-		 * Memory layout when there is CXL HDM (Host-managed Device Memory):
-		 * --------------  <- TOHM
-		 * CXL memory regions (pds global variable records the base/size of them)
-		 * Processor attached high memory
-		 * --------------  <- 0x100000000 (4GB)
-		 */
-		res = upper_ram_end(dev, index++,
-			mc_values[TOHM_REG] - ((uint64_t)gi_mem_size << 26) + 1);
-		LOG_RESOURCE("high_ram", dev, res);
+	/* Add high RAM */
+	const struct SystemMemoryMapHob *mm = get_system_memory_map();
 
+	for (int i = 0; i < mm->numberEntries; i++) {
+		const struct SystemMemoryMapElement *e = &mm->Element[i];
+		uint64_t addr = ((uint64_t)e->BaseAddress << MEM_ADDR_64MB_SHIFT_BITS);
+		uint64_t size = ((uint64_t)e->ElementSize << MEM_ADDR_64MB_SHIFT_BITS);
+		if (addr < 4ULL * GiB)
+			continue;
+		if (!is_memtype_processor_attached(e->Type))
+			continue;
+		if (is_memtype_reserved(e->Type))
+			continue;
+
+		res = ram_range(dev, index++, addr, size);
+		LOG_RESOURCE("high_ram", dev, res);
+	}
+
+	uint64_t prmrr_base, prmrr_size;
+	for (unsigned int i = 0; i < get_prmrr_count(); i++) {
+		if (get_prmrr_region(MSR_PRMRR_BASE(i), &prmrr_base, &prmrr_size)) {
+			res = reserved_ram_range(dev, index++, prmrr_base, prmrr_size);
+			LOG_RESOURCE("prmrr", dev, res);
+		}
+	}
+
+	if (CONFIG(SOC_INTEL_HAS_CXL)) {
 		/* CXL Memory */
 		uint8_t i;
 		for (i = 0; i < pds.num_pds; i++) {
@@ -317,10 +358,6 @@ static void mc_add_dram_resources(struct device *dev, int *res_count)
 			else
 				LOG_RESOURCE("CXL_memory", dev, res);
 		}
-	} else {
-		/* 4GiB -> TOHM */
-		res = upper_ram_end(dev, index++, mc_values[TOHM_REG] + 1);
-		LOG_RESOURCE("high_ram", dev, res);
 	}
 
 	/* add MMIO CFG resource */
@@ -350,7 +387,7 @@ static void mc_add_dram_resources(struct device *dev, int *res_count)
 
 static void mmapvtd_read_resources(struct device *dev)
 {
-	int index = 0;
+	int index = MC_DRAM_RESOURCE_ANON_START;
 
 	/* Read standard PCI resources. */
 	pci_dev_read_resources(dev);
@@ -362,13 +399,33 @@ static void mmapvtd_read_resources(struct device *dev)
 	mc_add_dram_resources(dev, &index);
 }
 
+static void mmapvtd_set_resources(struct device *dev)
+{
+	/*
+	 * The MMIO high window has to be added in set_resources() instead of
+	 * read_resources(). Because adding in read_resources() would cause the
+	 * whole window to be reserved, and it couldn't be used for resource
+	 * allocation.
+	 */
+	if (is_domain0(dev->upstream->dev)) {
+		resource_t mmio64_base, mmio64_size;
+		if (get_mmio_high_base_size(&mmio64_base, &mmio64_size)) {
+			assert(!probe_resource(dev, MC_DRAM_RESOURCE_MMIO_HIGH));
+			fixed_mem_range_flags(dev, MC_DRAM_RESOURCE_MMIO_HIGH,
+					      mmio64_base, mmio64_size, IORESOURCE_STORED);
+		}
+	}
+
+	pci_dev_set_resources(dev);
+}
+
 static void mmapvtd_init(struct device *dev)
 {
 }
 
 static struct device_operations mmapvtd_ops = {
 	.read_resources    = mmapvtd_read_resources,
-	.set_resources     = pci_dev_set_resources,
+	.set_resources     = mmapvtd_set_resources,
 	.enable_resources  = pci_dev_enable_resources,
 	.init              = mmapvtd_init,
 	.ops_pci           = &soc_pci_ops,
@@ -376,6 +433,7 @@ static struct device_operations mmapvtd_ops = {
 
 static const unsigned short mmapvtd_ids[] = {
 	MMAP_VTD_CFG_REG_DEVID, /* Memory Map/Intel® VT-d Configuration Registers */
+	MMAP_VTD_STACK_CFG_REG_DEVID,
 	0
 };
 
@@ -384,29 +442,6 @@ static const struct pci_driver mmapvtd_driver __pci_driver = {
 	.vendor   = PCI_VID_INTEL,
 	.devices  = mmapvtd_ids
 };
-
-#if !CONFIG(SOC_INTEL_MMAPVTD_ONLY_FOR_DPR)
-static void vtd_read_resources(struct device *dev)
-{
-	pci_dev_read_resources(dev);
-
-	configure_dpr(dev);
-}
-
-static struct device_operations vtd_ops = {
-	.read_resources    = vtd_read_resources,
-	.set_resources     = pci_dev_set_resources,
-	.enable_resources  = pci_dev_enable_resources,
-	.ops_pci           = &soc_pci_ops,
-};
-
-/* VTD devices on other stacks */
-static const struct pci_driver vtd_driver __pci_driver = {
-	.ops      = &vtd_ops,
-	.vendor   = PCI_VID_INTEL,
-	.device   = MMAP_VTD_STACK_CFG_REG_DEVID,
-};
-#endif
 
 static void dmi3_init(struct device *dev)
 {

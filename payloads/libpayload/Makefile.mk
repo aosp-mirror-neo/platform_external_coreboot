@@ -78,8 +78,8 @@ CFLAGS += $(INCLUDES) -Os -pipe -nostdinc -ggdb3
 CFLAGS += -nostdlib -fno-builtin -ffreestanding -fomit-frame-pointer
 CFLAGS += -ffunction-sections -fdata-sections
 CFLAGS += -Wall -Wundef -Wstrict-prototypes -Wmissing-prototypes -Wvla
-CFLAGS += -Wwrite-strings -Wredundant-decls -Wno-trigraphs -Wimplicit-fallthrough
-CFLAGS += -Wstrict-aliasing -Wshadow -Werror
+CFLAGS += -Wwrite-strings -Wredundant-decls -Wimplicit-fallthrough
+CFLAGS += -Wstrict-aliasing -Wshadow -Wno-address-of-packed-member -Werror
 
 ifeq ($(CONFIG_LP_LTO),y)
 CFLAGS += -flto

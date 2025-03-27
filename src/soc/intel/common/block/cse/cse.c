@@ -40,6 +40,8 @@
 #define HECI_CIP_TIMEOUT_US	1000
 /* Wait up to 5 seconds for CSE to boot from RO(BP1) */
 #define CSE_DELAY_BOOT_TO_RO_MS	(5 * 1000)
+/* Wait up to 5 sec for CSE FW init to complete */
+#define CSE_FW_INIT_TIMEOUT_MS	(5 * 1000)
 
 #define SLOT_SIZE		sizeof(uint32_t)
 
@@ -296,6 +298,28 @@ bool cse_is_hfs1_spi_protected(void)
 	union me_hfsts1 hfs1;
 	hfs1.data = me_read_config32(PCI_ME_HFSTS1);
 	return !hfs1.fields.mfg_mode;
+}
+
+#define ME_HFSTS2_CUR_PM_EVENT_SHIFT 24
+#define ME_HFSTS2_CUR_PM_EVENT_MASK (0xf << ME_HFSTS2_CUR_PM_EVENT_SHIFT)
+
+static uint8_t cse_get_hfs2_current_pm_event(void)
+{
+	uint32_t data = me_read_config32(PCI_ME_HFSTS2);
+	return (uint8_t)((data & ME_HFSTS2_CUR_PM_EVENT_MASK) >>
+						ME_HFSTS2_CUR_PM_EVENT_SHIFT);
+}
+
+bool cse_check_host_cold_reset(void)
+{
+	uint8_t event = cse_get_hfs2_current_pm_event();
+
+	switch (event) {
+	case PWR_CYCLE_RESET_CMOFF:
+		return true;
+	default:
+		return false;
+	}
 }
 
 bool cse_is_hfs3_fw_sku_lite(void)
@@ -1171,10 +1195,8 @@ void cse_enable_ptt(bool state)
 	 * 4) HFSTS1 FW Init Complete is set
 	 * 5) Before EOP issued to CSE
 	 */
-	if (!cse_is_hfs1_cws_normal() || !cse_is_hfs1_com_normal() ||
-	    !cse_is_hfs1_fw_init_complete() || !ENV_RAMSTAGE) {
-		printk(BIOS_ERR, "HECI: Unmet prerequisites for"
-				 "FW FEATURE SHIPMENT TIME STATE OVERRIDE\n");
+	if (!cse_is_hfs1_cws_normal() || !cse_is_hfs1_com_normal() || !ENV_RAMSTAGE) {
+		printk(BIOS_ERR, "HECI: Could not set PTT state because ME is not ready\n");
 		return;
 	}
 
@@ -1187,6 +1209,14 @@ void cse_enable_ptt(bool state)
 		printk(BIOS_DEBUG, "HECI: PTT is already in the requested state\n");
 		return;
 	}
+
+	int elapsed = wait_ms(CSE_FW_INIT_TIMEOUT_MS, cse_is_hfs1_fw_init_complete());
+	if (!elapsed) {
+		printk(BIOS_ERR, "HECI: Could not set PTT state because ME is not ready\n");
+		return;
+	}
+
+	printk(BIOS_DEBUG, "HECI: CSE took %d ms to become ready\n", elapsed);
 
 	printk(BIOS_DEBUG, "HECI: Send FW FEATURE SHIPMENT TIME STATE OVERRIDE Command\n");
 
@@ -1479,7 +1509,8 @@ struct device_operations cse_ops = {
 };
 
 static const unsigned short pci_device_ids[] = {
-	PCI_DID_INTEL_PTL_CSE0,
+	PCI_DID_INTEL_PTL_H_CSE0,
+	PCI_DID_INTEL_PTL_U_H_CSE0,
 	PCI_DID_INTEL_LNL_CSE0,
 	PCI_DID_INTEL_MTL_CSE0,
 	PCI_DID_INTEL_APL_CSE0,

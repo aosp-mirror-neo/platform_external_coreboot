@@ -22,7 +22,7 @@ chip soc/intel/cannonlake
 	register "usb3_ports[4]" = "USB3_PORT_DEFAULT(OC0)"
 	register "usb3_ports[5]" = "USB3_PORT_DEFAULT(OC0)"
 
-	register "PchHdaDspEnable" = "1"
+	register "PchHdaDspEnable" = "true"
 	register "PchHdaAudioLinkHda" = "1"
 
 	register "PcieClkSrcUsage[0]" = "1"
@@ -40,7 +40,7 @@ chip soc/intel/cannonlake
 	register "PcieClkSrcClkReq[5]" = "5"
 
 	# Disable S0ix
-	register "s0ix_enable" = "0"
+	register "s0ix_enable" = "false"
 
 	device domain 0 on
 		device pci 00.0 on  end # Host Bridge

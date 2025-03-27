@@ -29,10 +29,10 @@ chip soc/intel/alderlake
 	register "gen3_dec" = "0x00fc0901"
 
 	# S0ix enable
-	register "s0ix_enable" = "1"
+	register "s0ix_enable" = "true"
 
 	# DPTF enable
-	register "dptf_enable" = "1"
+	register "dptf_enable" = "true"
 
 	register "tcc_offset" = "10"     # TCC of 90
 
@@ -40,7 +40,7 @@ chip soc/intel/alderlake
 	register "cnvi_bt_core" = "true"
 
 	# eMMC HS400
-	register "emmc_enable_hs400_mode" = "1"
+	register "emmc_enable_hs400_mode" = "true"
 
 	#eMMC DLL tuning parameters
 	#Adding the intermediate eMMC DLL tuning override values
@@ -92,7 +92,10 @@ chip soc/intel/alderlake
 
 	# FIXME: To be enabled in future based on PNP impact data.
 	# Disable Package C-state demotion for nissa baseboard.
-	register "disable_package_c_state_demotion" = "1"
+	register "disable_package_c_state_demotion" = "true"
+
+	# Vccin Aux Imon Iccmax, follow RDC#646929 Power Map requirement
+	register "vccin_aux_imon_iccmax" = "PD_TIER_VOLUME" # 27A
 
 	# Intel Common SoC Config
 	#+-------------------+---------------------------+

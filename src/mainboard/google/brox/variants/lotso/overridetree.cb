@@ -5,7 +5,6 @@ fw_config
 		option RETIMER_JHL8040		2
 	end
 	field STORAGE 2 3
-		option STORAGE_UNKNOWN		0
 		option STORAGE_UFS		1
 		option STORAGE_NVME		2
 	end
@@ -75,8 +74,8 @@ chip soc/intel/alderlake
 
 	register "power_limits_config[RPL_P_282_242_142_15W_CORE]" = "{
 		.tdp_pl1_override = 15,
-		.tdp_pl2_override = 40,
-		.tdp_pl4 = 57,
+		.tdp_pl2_override = 25,
+		.tdp_pl4 = 114,
 	}"
 
 	device domain 0 on
@@ -160,9 +159,9 @@ chip soc/intel/alderlake
 
 				## Charger Performance Control (Control, mA)
 				register "controls.charger_perf" = "{
-						[0] = { 255, 1700 },
-						[1] = {  24, 1500 },
-						[2] = {  16, 1000 },
+						[0] = { 255, 4200 },
+						[1] = {  48, 3000 },
+						[2] = {  32, 2000 },
 						[3] = {   8,  500 }
 				}"
 
@@ -181,7 +180,7 @@ chip soc/intel/alderlake
 				}"
 
 				## Fan options
-				register "options.fan.fine_grained_control" = "1"
+				register "options.fan.fine_grained_control" = "true"
 				register "options.fan.step_size" = "2"
 
 				device generic 0 alias dptf_policy on end
@@ -219,11 +218,14 @@ chip soc/intel/alderlake
 				register "compat_string" = ""google,cros-ec-spi""
 				register "irq" = "ACPI_IRQ_WAKE_LEVEL_LOW(GPP_E18_IRQ)"
 				register "wake" = "GPE0_DW2_18"
-				register "has_power_resource" = "1"
+				register "has_power_resource" = "true"
 				register "reset_gpio" = "ACPI_GPIO_OUTPUT_ACTIVE_LOW(GPP_E21)"
 				register "enable_gpio" = "ACPI_GPIO_OUTPUT_ACTIVE_HIGH(GPP_E20)"
 				register "enable_delay_ms" = "3"
-				device spi 0 on end
+				device spi 0 on
+					probe FP FP_PRESENT
+					probe unprovisioned
+				end
 			end # FPMCU
 		end
 		device ref pmc hidden
@@ -282,8 +284,6 @@ chip soc/intel/alderlake
 					chip drivers/usb/acpi
 						register "desc" = ""USB2 Camera""
 						register "type" = "UPC_TYPE_INTERNAL"
-						register "has_power_resource" = "1"
-						register "enable_gpio" = "ACPI_GPIO_OUTPUT_ACTIVE_HIGH(GPP_E7)"
 						device ref usb2_port6 on end
 					end
 					chip drivers/usb/acpi
@@ -303,7 +303,6 @@ chip soc/intel/alderlake
 					chip drivers/usb/acpi
 						register "desc" = ""USB2 Bluetooth""
 						register "type" = "UPC_TYPE_INTERNAL"
-						register "has_power_resource" = "1"
 						register "reset_gpio" = "ACPI_GPIO_OUTPUT_ACTIVE_LOW(GPP_A13)"
 						device ref usb2_port10 on end
 					end
@@ -330,9 +329,10 @@ chip soc/intel/alderlake
 				.clk_req = 0,
 				.clk_src = 0,
 				.flags = PCIE_RP_LTR | PCIE_RP_AER,
+				.pcie_rp_aspm = ASPM_L1,
 			}"
-			probe STORAGE STORAGE_UNKNOWN
 			probe STORAGE STORAGE_NVME
+			probe unprovisioned
 		end
 		device ref pcie_rp5 on
 			register "pch_pcie_rp[PCH_RP(5)]" = "{
@@ -343,6 +343,7 @@ chip soc/intel/alderlake
 			chip drivers/wifi/generic
 				register "wake" = "GPE0_DW0_03"
 				register "add_acpi_dma_property" = "true"
+				use usb2_port10 as bluetooth_companion
 				device pci 00.0 on end
 			end
 			chip soc/intel/common/block/pcie/rtd3
@@ -352,6 +353,7 @@ chip soc/intel/alderlake
 				device generic 0 on end
 			end
 			probe WIFI_BT WIFI_PCIE_WIFI7
+			probe unprovisioned
 		end
 		device ref pcie_rp6 on
 			# Enable SD Card PCIE6 rp6 using clk 3
@@ -359,8 +361,10 @@ chip soc/intel/alderlake
 				.clk_src = 3,
 				.clk_req = 3,
 				.flags = PCIE_RP_HOTPLUG | PCIE_RP_LTR | PCIE_RP_AER,
+				.pcie_rp_aspm = ASPM_L1,
 			}"
 			chip soc/intel/common/block/pcie/rtd3
+				register "enable_gpio" = "ACPI_GPIO_OUTPUT_ACTIVE_HIGH(GPP_A17)"
 				register "reset_gpio" = "ACPI_GPIO_OUTPUT_ACTIVE_LOW(GPP_E7)"
 				register "enable_delay_ms" = "1"
 				register "srcclk_pin" = "3"
@@ -375,17 +379,18 @@ chip soc/intel/alderlake
 				device generic 0 on end
 			end
 			probe WIFI_BT WIFI_CNVI_WIFI6E
+			probe unprovisioned
 		end
 		device ref ish on
 			chip drivers/intel/ish
 				device generic 0 alias ish_conf on end
 			end
-			probe STORAGE STORAGE_UNKNOWN
 			probe STORAGE STORAGE_UFS
+			probe unprovisioned
 		end
 		device ref ufs on
-			probe STORAGE STORAGE_UNKNOWN
 			probe STORAGE STORAGE_UFS
+			probe unprovisioned
 		end
 		device ref i2c0 on
 			chip drivers/i2c/generic
@@ -413,7 +418,7 @@ chip soc/intel/alderlake
 				register "hid" = ""GXTS7986""
 				register "uid" = "0x3"
 				register "irq" = "ACPI_IRQ_WAKE_EDGE_LOW(GPP_F18_IRQ)"
-				register "speed" = "10 * MHz"
+				register "speed" = "9 * MHz"
 				register "reset_gpio" = "ACPI_GPIO_OUTPUT_ACTIVE_LOW(GPP_F17)"
 				register "enable_gpio" = "ACPI_GPIO_OUTPUT_ACTIVE_HIGH(GPP_F7)"
 				register "property_count" = "1"

@@ -8,19 +8,23 @@
 #include <device/device.h>
 #include <drivers/wifi/generic/wifi.h>
 #include <elog.h>
+#include <fsp/api.h>
 #include <fsp/fsp_debug_event.h>
 #include <fsp/util.h>
 #include <gpio.h>
 #include <intelbasecode/debug_feature.h>
 #include <intelblocks/cpulib.h>
+#include <intelblocks/cse.h>
 #include <intelblocks/pcie_rp.h>
 #include <option.h>
+#include <soc/intel/common/reset.h>
 #include <soc/iomap.h>
 #include <soc/msr.h>
 #include <soc/pci_devs.h>
 #include <soc/pcie.h>
 #include <soc/romstage.h>
 #include <soc/soc_chip.h>
+#include <static.h>
 #include <string.h>
 
 #include "ux.h"
@@ -71,10 +75,12 @@ static void pcie_rp_init(FSP_M_CONFIG *m_cfg, uint32_t en_mask, enum pcie_rp_typ
 			printk(BIOS_WARNING, "Missing root port clock structure definition\n");
 			continue;
 		}
-		if (clk_req_mapping & (1 << cfg[i].clk_req))
-			printk(BIOS_WARNING, "Found overlapped clkreq assignment on clk req %d\n"
-				, cfg[i].clk_req);
+
 		if (!(cfg[i].flags & PCIE_RP_CLK_REQ_UNUSED)) {
+			if (clk_req_mapping & (1 << cfg[i].clk_req))
+				printk(BIOS_WARNING,
+				       "Found overlapped clkreq assignment on clk req %d\n",
+				       cfg[i].clk_req);
 			m_cfg->PcieClkSrcClkReq[cfg[i].clk_src] = cfg[i].clk_req;
 			clk_req_mapping |= 1 << cfg[i].clk_req;
 		}
@@ -352,7 +358,7 @@ static void fill_fspm_trace_params(FSP_M_CONFIG *m_cfg,
 		const struct soc_intel_alderlake_config *config)
 {
 	/* Set debug probe type */
-	m_cfg->PlatformDebugConsent = CONFIG_SOC_INTEL_ALDERLAKE_DEBUG_CONSENT;
+	m_cfg->PlatformDebugConsent = CONFIG_SOC_INTEL_COMMON_DEBUG_CONSENT;
 
 	/* CrashLog config */
 	m_cfg->CpuCrashLogDevice = CONFIG(SOC_INTEL_CRASHLOG) && is_devfn_enabled(SA_DEVFN_TMT);
@@ -409,6 +415,54 @@ static void debug_override_memory_init_params(FSP_M_CONFIG *mupd)
 	debug_get_pch_cpu_tracehub_modes(&mupd->CpuTraceHubMode, &mupd->PchTraceHubMode);
 }
 
+#if CONFIG(PLATFORM_HAS_EARLY_LOW_BATTERY_INDICATOR)
+void platform_display_early_shutdown_notification(void *arg)
+{
+	ux_inform_user_of_poweroff_operation("low-battery shutdown");
+}
+#endif
+
+static void fill_fspm_sign_of_life(FSP_M_CONFIG *m_cfg,
+				   FSPM_ARCH_UPD *arch_upd)
+{
+	const char *name;
+	bool esol_required = false;
+
+	/*
+	 * Memory training
+	 *
+	 * If valid MRC cache data is not found, FSP should perform a memory
+	 * training. Memory training can take a while so let's inform the end
+	 * user with an on-screen text message.
+	 */
+	if (!arch_upd->NvsBufferPtr) {
+		esol_required = true;
+		name = "memory training";
+		elog_add_event_byte(ELOG_TYPE_FW_EARLY_SOL, ELOG_FW_EARLY_SOL_MRC);
+	}
+
+	/*
+	 * CSE Sync
+	 *
+	 * If currently running CSE RW firmware version is different than CSE version
+	 * packed as part of the CBFS then CSE sync will be triggered. CSE sync can take
+	 * < 1-minute hence, let's inform the end user with an on-screen text message.
+	 */
+	if (CONFIG(SOC_INTEL_CSE_LITE_SYNC_IN_RAMSTAGE) && is_cse_fw_update_required()
+		&& !is_cse_boot_to_rw()) {
+		if (esol_required) {
+			name = "memory training and CSE update";
+		} else {
+			name = "CSE update";
+			esol_required =  true;
+		}
+		elog_add_event_byte(ELOG_TYPE_FW_EARLY_SOL, ELOG_FW_EARLY_SOL_CSE_SYNC);
+	}
+
+	if (esol_required)
+		ux_inform_user_of_update_operation(name);
+}
+
 void platform_fsp_memory_init_params_cb(FSPM_UPD *mupd, uint32_t version)
 {
 	const struct soc_intel_alderlake_config *config;
@@ -432,15 +486,9 @@ void platform_fsp_memory_init_params_cb(FSPM_UPD *mupd, uint32_t version)
 		}
 	}
 
-	/*
-	 * If valid MRC cache data is not found, FSP should perform a memory
-	 * training. Memory training can take a while so let's inform the end
-	 * user with an on-screen text message.
-	 */
-	if (!arch_upd->NvsBufferPtr) {
-		if (ux_inform_user_of_update_operation("memory training"))
-			elog_add_event_byte(ELOG_TYPE_FW_EARLY_SOL, ELOG_FW_EARLY_SOL_MRC);
-	}
+	if (CONFIG(CHROMEOS_ENABLE_ESOL))
+		fill_fspm_sign_of_life(m_cfg, arch_upd);
+
 	config = config_of_soc();
 
 	soc_memory_init_params(m_cfg, config);

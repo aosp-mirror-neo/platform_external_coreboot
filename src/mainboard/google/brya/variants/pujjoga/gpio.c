@@ -4,8 +4,10 @@
 #include <baseboard/variants.h>
 #include <soc/gpio.h>
 
-/* Pad configuration in ramstage for Sundance */
+/* Pad configuration in ramstage for Pujjoga and Pujjogatwin */
 static const struct pad_config override_gpio_table[] = {
+	/* F12 : WWAN_RST_L */
+	PAD_CFG_GPO_LOCK(GPP_F12, 1, LOCK_CONFIG),
 	/* A8  : WWAN_RF_DISABLE_ODL */
 	PAD_CFG_GPO(GPP_A8, 1, DEEP),
 	/* A18  : HDMI_HPD */
@@ -17,7 +19,7 @@ static const struct pad_config override_gpio_table[] = {
 	/* B6  : SOC_I2C_SUB_SCL */
 	PAD_CFG_NF(GPP_B6, NONE, DEEP, NF2),
 	/* C1  : SMBDATA ==> USI_RST_L */
-	PAD_CFG_TERM_GPO(GPP_C1, 1, UP_20K, DEEP),
+	PAD_CFG_GPO(GPP_C1, 1, DEEP),
 	/* D3  : test point */
 	PAD_NC_LOCK(GPP_D3, NONE, LOCK_CONFIG),
 	/* D6  : SRCCLKREQ1# ==> WWAN_EN */
@@ -34,8 +36,6 @@ static const struct pad_config override_gpio_table[] = {
 	PAD_NC_LOCK(GPP_E20, NONE, LOCK_CONFIG),
 	/* E21  : NC */
 	PAD_NC_LOCK(GPP_E21, NONE, LOCK_CONFIG),
-	/* F12 : WWAN_RST_L */
-	PAD_CFG_GPO_LOCK(GPP_F12, 1, LOCK_CONFIG),
 	/* H12  : NC */
 	PAD_NC_LOCK(GPP_H12, NONE, LOCK_CONFIG),
 	/* H13  : NC */
@@ -44,8 +44,8 @@ static const struct pad_config override_gpio_table[] = {
 	PAD_CFG_NF(GPP_H15, NONE, DEEP, NF1),
 	/* H17  : DDPB_CTRLDATA */
 	PAD_CFG_NF(GPP_H17, NONE, DEEP, NF1),
-	/* H19  : SOC_I2C_SUB_INT_ODL */
-	PAD_CFG_GPI_LOCK(GPP_H19, NONE, LOCK_CONFIG),
+	/* H19 : SOC_I2C_SUB_INT_ODL */
+	PAD_CFG_GPI_APIC(GPP_H19, NONE, PLTRST, LEVEL, NONE),
 	/* H21  : WWAN_PERST_L */
 	PAD_NC_LOCK(GPP_H21, NONE, LOCK_CONFIG),
 	/* H22  : WCAM_MCLK_R ==> NC */
@@ -84,6 +84,8 @@ static const struct pad_config early_gpio_table[] = {
 
 /* Pad configuration in romstage for Sundance */
 static const struct pad_config romstage_gpio_table[] = {
+	/* F12 : WWAN_RST_L */
+	PAD_CFG_GPO(GPP_F12, 1, DEEP),
 	/* Enable touchscreen, hold in reset */
 	/* C0  : SMBCLK ==> EN_PP3300_TCHSCR */
 	PAD_CFG_GPO(GPP_C0, 1, DEEP),

@@ -30,7 +30,7 @@ static inline void init_xeon_domain_path(struct device_path *path, int socket,
 		.bus = bus,
 	};
 	path->type = DEVICE_PATH_DOMAIN;
-	path->domain.domain = dp.domain_path;
+	path->domain.domain_id = dp.domain_path;
 };
 
 /*
@@ -83,12 +83,7 @@ bool is_cxl_domain(const struct device *dev);
 #define is_dev_on_ubox_domain(dev) is_ubox_domain(dev_get_domain(dev))
 #define is_dev_on_cxl_domain(dev) is_cxl_domain(dev_get_domain(dev))
 
-#define is_domain0(dev) (dev && dev->path.type == DEVICE_PATH_DOMAIN &&\
-		dev->path.domain.domain == 0)
-#define is_dev_on_domain0(dev) (is_domain0(dev_get_domain(dev)))
 #define is_stack0(socket, stack) (socket == 0 && stack == IioStack0)
-
-void unlock_pam_regions(void);
 
 size_t vtd_probe_bar_size(struct device *dev);
 

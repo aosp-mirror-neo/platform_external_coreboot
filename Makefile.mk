@@ -373,7 +373,7 @@ endef
 cbfs-files-processor-struct= \
 	$(eval $(2): $(1) $(obj)/build.h $(obj)/fmap_config.h $(KCONFIG_AUTOHEADER); \
 		printf "    CC+STRIP   $(1)\n"; \
-		$(CC_ramstage) -MMD $(CPPFLAGS_ramstage) $(CFLAGS_ramstage) --param asan-globals=0 $$(ramstage-c-ccopts) -include $(KCONFIG_AUTOHEADER) -MT $(2) -o $(2).tmp -c $(1) && \
+		$(CC_ramstage) -MMD $(CPPFLAGS_ramstage) $(CFLAGS_ramstage) -fno-lto --param asan-globals=0 $$(ramstage-c-ccopts) -include $(KCONFIG_AUTOHEADER) -MT $(2) -o $(2).tmp -c $(1) && \
 		$(OBJCOPY_ramstage) -O binary --only-section='.*data*' --only-section='.*bss*' \
 		--set-section-flags .*bss*=alloc,contents,load $(2).tmp $(2); \
 		rm -f $(2).tmp) \
@@ -515,7 +515,6 @@ CFLAGS_common += -Wstrict-prototypes
 CFLAGS_common += -Wmissing-prototypes
 CFLAGS_common += -Wwrite-strings
 CFLAGS_common += -Wredundant-decls
-CFLAGS_common += -Wno-trigraphs
 CFLAGS_common += -Wimplicit-fallthrough
 CFLAGS_common += -Wshadow
 CFLAGS_common += -Wdate-time
@@ -544,6 +543,14 @@ CFLAGS_common += -Wnull-dereference
 CFLAGS_common += -Wlogical-op
 CFLAGS_common += -Wduplicated-cond
 CFLAGS_common += -Wno-array-compare
+endif
+endif
+
+ifeq ($(CONFIG_LTO),y)
+CFLAGS_common += -flto
+# Clang can not deal with GCC lto objects
+ifeq ($(CONFIG_COMPILER_GCC),y)
+ADAFLAGS_common += -flto
 endif
 endif
 
@@ -603,6 +610,7 @@ LDFLAGS_common := --gc-sections
 LDFLAGS_common += -nostdlib
 LDFLAGS_common += --nmagic
 LDFLAGS_common += -static
+LDFLAGS_common += -z noexecstack
 
 # Workaround for RISC-V linker bug, merge back into above line when fixed.
 # https://sourceware.org/bugzilla/show_bug.cgi?id=27180
@@ -627,7 +635,7 @@ endif
 
 additional-dirs += $(objutil)/cbfstool $(objutil)/ifdtool \
 		   $(objutil)/options $(objutil)/amdfwtool \
-		   $(objutil)/cbootimage
+		   $(objutil)/cbootimage $(objutil)/ffs
 
 export $(COREBOOT_EXPORTS)
 
@@ -669,6 +677,8 @@ IFITTOOL:=$(objutil)/cbfstool/ifittool
 AMDCOMPRESS:=$(objutil)/cbfstool/amdcompress
 CSE_FPT:=$(objutil)/cbfstool/cse_fpt
 CSE_SERGER:=$(objutil)/cbfstool/cse_serger
+ECCTOOL:=$(objutil)/ffs/ecc/ecc
+CREATE_CONTAINER:=$(objutil)/open-power-signing-utils/create-container
 
 $(obj)/cbfstool: $(CBFSTOOL)
 	cp $< $@
@@ -709,6 +719,18 @@ IFDTOOL:=$(objutil)/ifdtool/ifdtool
 
 AMDFWTOOL:=$(objutil)/amdfwtool/amdfwtool
 AMDFWREAD:=$(objutil)/amdfwtool/amdfwread
+
+$(ECCTOOL):
+	@printf "    Compile ECCTOOL\n"
+	cp -r $(top)/3rdparty/ffs $(objutil)
+	cd $(objutil)/ffs && autoreconf -i && ./configure
+	$(MAKE) -C $(objutil)/ffs
+
+$(CREATE_CONTAINER):
+	@printf "    Compile Open-Power SecureBoot Signing Utils\n"
+	cp -r $(top)/3rdparty/open-power-signing-utils $(objutil)
+	cd $(objutil)/open-power-signing-utils && autoreconf -i -Wno-unsupported && ./configure
+	$(MAKE) -C $(objutil)/open-power-signing-utils
 
 APCB_EDIT_TOOL:=$(top)/util/apcb/apcb_edit.py
 
@@ -753,6 +775,10 @@ SCONFIG_OPTIONS += --output_d=$(DEVICETREE_DEVICENAMES_H)
 DEVICETREE_FWCONFIG_H := $(obj)/static_fw_config.h
 SCONFIG_OPTIONS += --output_f=$(DEVICETREE_FWCONFIG_H)
 
+# Generated at the same time as static.c
+$(DEVICETREE_STATIC_H): $(DEVICETREE_STATIC_C)
+	true
+
 $(DEVICETREE_STATIC_C): $(DEVICETREE_FILE) $(OVERRIDE_DEVICETREE_FILE) $(CHIPSET_DEVICETREE_FILE) $(objutil)/sconfig/sconfig
 	@printf "    SCONFIG    $(subst $(src)/,,$(<))\n"
 	mkdir -p $(dir $(DEVICETREE_STATIC_C))
@@ -765,13 +791,13 @@ bootblock-y+=$(DEVICETREE_STATIC_C)
 postcar-y+=$(DEVICETREE_STATIC_C)
 smm-y+=$(DEVICETREE_STATIC_C)
 
-# Ensure static.c and static.h are created before any objects are compiled
-ramstage-c-deps+=$(DEVICETREE_STATIC_C)
-romstage-c-deps+=$(DEVICETREE_STATIC_C)
-verstage-c-deps+=$(DEVICETREE_STATIC_C)
-bootblock-c-deps+=$(DEVICETREE_STATIC_C)
-postcar-c-deps+=$(DEVICETREE_STATIC_C)
-smm-c-deps+=$(DEVICETREE_STATIC_C)
+# Ensure static.h is generated before any objects are compiled
+ramstage-c-gen-deps+=$(DEVICETREE_STATIC_H)
+romstage-c-gen-deps+=$(DEVICETREE_STATIC_H)
+verstage-c-gen-deps+=$(DEVICETREE_STATIC_H)
+bootblock-c-gen-deps+=$(DEVICETREE_STATIC_H)
+postcar-c-gen-deps+=$(DEVICETREE_STATIC_H)
+smm-c-gen-deps+=$(DEVICETREE_STATIC_H)
 
 # Ensure fmap_config.h are created before any objects are compiled
 ramstage-c-deps+=$(obj)/fmap_config.h
@@ -820,7 +846,7 @@ install-git-commit-clangfmt:
 include util/crossgcc/Makefile.mk
 
 .PHONY: tools
-tools: $(objutil)/kconfig/conf $(objutil)/kconfig/toada $(CBFSTOOL) $(objutil)/cbfstool/cbfs-compression-tool $(FMAPTOOL) $(RMODTOOL) $(IFWITOOL) $(objutil)/nvramtool/nvramtool $(objutil)/sconfig/sconfig $(IFDTOOL) $(CBOOTIMAGE) $(AMDFWTOOL) $(AMDCOMPRESS) $(FUTILITY) $(BINCFG) $(IFITTOOL) $(objutil)/supermicro/smcbiosinfo $(CSE_FPT) $(CSE_SERGER) $(AMDFWREAD)
+tools: $(objutil)/kconfig/conf $(objutil)/kconfig/toada $(CBFSTOOL) $(objutil)/cbfstool/cbfs-compression-tool $(FMAPTOOL) $(RMODTOOL) $(IFWITOOL) $(objutil)/nvramtool/nvramtool $(objutil)/sconfig/sconfig $(IFDTOOL) $(CBOOTIMAGE) $(AMDFWTOOL) $(AMDCOMPRESS) $(FUTILITY) $(BINCFG) $(IFITTOOL) $(objutil)/supermicro/smcbiosinfo $(CSE_FPT) $(CSE_SERGER) $(AMDFWREAD) $(ECCTOOL) $(CREATE_CONTAINER)
 
 ###########################################################################
 # Common recipes for all stages
@@ -962,7 +988,6 @@ endif
 #
 # CBFSTOOL_ADD_CMD_OPTIONS can be used by arch/SoC/mainboard to supply
 # add commands with any additional arguments for cbfstool.
-# Example: --ext-win-base <base> --ext-win-size <size>
 define cbfs-add-cmd-for-region
 	$(CBFSTOOL) $@.tmp \
 	add$(if $(filter stage,$(call extract_nth,3,$(1))),-stage)$(if \
@@ -1312,6 +1337,21 @@ ifeq ($(CONFIG_CBFS_VERIFICATION),y)
 		exit 1 ;\
 	fi
 endif # CONFIG_CBFS_VERIFICATION
+
+LTO_LINK_CFLAGS := -Wno-stack-usage
+
+define link_stage
+# $1 stage name
+ifeq ($(CONFIG_LTO),y)
+$$(objcbfs)/$(1).debug: $$$$($(1)-libs) $$$$($(1)-objs)
+	@printf "    LINK       $$(subst $$(obj)/,,$$(@))\n"
+	$$(CC_$(1)) $$(CPPFLAGS_$(1)) $$(CFLAGS_$(1)) $$(LDFLAGS_$(1):%=-Wl,%) $(LTO_LINK_CFLAGS) -o $$@ -L$$(obj) $$(COMPILER_RT_FLAGS_$(1):%=-Wl,%) -Wl,--whole-archive -Wl,--start-group $$(filter-out %.ld,$$($(1)-objs)) $$($(1)-libs) -Wl,--no-whole-archive $$(COMPILER_RT_$(1)) -Wl,--end-group -T $(call src-to-obj,$(1),$(CONFIG_MEMLAYOUT_LD_FILE))
+else
+$$(objcbfs)/$(1).debug: $$$$($(1)-libs) $$$$($(1)-objs)
+	@printf "    LINK       $$(subst $$(obj)/,,$$(@))\n"
+	$$(LD_$(1)) $$(LDFLAGS_$(1)) -o $$@ -L$$(obj) $$(COMPILER_RT_FLAGS_$(1)) --whole-archive --start-group $$(filter-out %.ld,$$($(1)-objs)) $$($(1)-libs) --no-whole-archive $$(COMPILER_RT_$(1)) --end-group -T $(call src-to-obj,$(1),$(CONFIG_MEMLAYOUT_LD_FILE))
+endif
+endef
 
 ifeq ($(CONFIG_SEPARATE_ROMSTAGE),y)
 cbfs-files-y += $(CONFIG_CBFS_PREFIX)/romstage

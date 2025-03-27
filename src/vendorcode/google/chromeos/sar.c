@@ -53,7 +53,7 @@ static uint8_t *wifi_hextostr(const char *sar_str, size_t str_len, size_t *sar_b
 	return sar_bin;
 }
 
-static int sar_table_size(const struct sar_profile *sar)
+static size_t sar_table_size(const struct sar_profile *sar)
 {
 	if (sar == NULL)
 		return 0;
@@ -62,7 +62,7 @@ static int sar_table_size(const struct sar_profile *sar)
 					      sar->subbands_count));
 }
 
-static int wgds_table_size(const struct geo_profile *geo)
+static size_t wgds_table_size(const struct geo_profile *geo)
 {
 	if (geo == NULL)
 		return 0;
@@ -70,7 +70,7 @@ static int wgds_table_size(const struct geo_profile *geo)
 	return sizeof(struct geo_profile) + (geo->chains_count * geo->bands_count);
 }
 
-static int gain_table_size(const struct gain_profile *gain)
+static size_t gain_table_size(const struct gain_profile *gain)
 {
 	if (gain == NULL)
 		return 0;
@@ -78,7 +78,7 @@ static int gain_table_size(const struct gain_profile *gain)
 	return sizeof(struct gain_profile) + (gain->chains_count * gain->bands_count);
 }
 
-static int sar_avg_table_size(const struct avg_profile *sar_avg)
+static size_t sar_avg_table_size(const struct avg_profile *sar_avg)
 {
 	if (sar_avg == NULL)
 		return 0;
@@ -86,7 +86,7 @@ static int sar_avg_table_size(const struct avg_profile *sar_avg)
 	return sizeof(struct avg_profile);
 }
 
-static int dsm_table_size(const struct dsm_profile *dsm)
+static size_t dsm_table_size(const struct dsm_profile *dsm)
 {
 	if (dsm == NULL)
 		return 0;
@@ -94,20 +94,96 @@ static int dsm_table_size(const struct dsm_profile *dsm)
 	return sizeof(struct dsm_profile);
 }
 
-static int bsar_table_size(const struct bsar_profile *bsar)
+static size_t bsar_table_size(const struct bsar_profile *bsar)
 {
+	int revs_offset = offsetof(struct bsar_profile, revs);
+
 	if (bsar == NULL)
 		return 0;
 
-	return sizeof(struct bsar_profile);
+	if (bsar->revision == 2)
+		return revs_offset + sizeof(bsar->revs.rev2);
+	return revs_offset + sizeof(bsar->revs.rev1);
 }
 
-static int wbem_table_size(const struct wbem_profile *wbem)
+static size_t wbem_table_size(const struct wbem_profile *wbem)
 {
 	if (wbem == NULL)
 		return 0;
 
 	return sizeof(struct wbem_profile);
+}
+
+static size_t bpag_table_size(const struct bpag_profile *bpag)
+{
+	if (bpag == NULL)
+		return 0;
+
+	return sizeof(struct bpag_profile);
+}
+
+static size_t bbfb_table_size(const struct bbfb_profile *bbfb)
+{
+	if (bbfb == NULL)
+		return 0;
+
+	return sizeof(struct bbfb_profile);
+}
+
+static size_t bdcm_table_size(const struct bdcm_profile *bdcm)
+{
+	if (bdcm == NULL)
+		return 0;
+
+	return sizeof(struct bdcm_profile);
+}
+
+static size_t bbsm_table_size(const struct bbsm_profile *bbsm)
+{
+	if (bbsm == NULL)
+		return 0;
+
+	return sizeof(struct bbsm_profile);
+}
+
+static size_t bucs_table_size(const struct bucs_profile *bucs)
+{
+	if (bucs == NULL)
+		return 0;
+
+	return sizeof(struct bucs_profile);
+}
+
+static size_t bdmm_table_size(const struct bdmm_profile *bdmm)
+{
+	if (bdmm == NULL)
+		return 0;
+
+	return sizeof(struct bdmm_profile);
+}
+
+static size_t ebrd_table_size(const struct ebrd_profile *ebrd)
+{
+	if (ebrd == NULL)
+		return 0;
+
+	return sizeof(struct ebrd_profile);
+}
+
+static size_t wpfc_table_size(const struct wpfc_profile *wpfc)
+{
+	if (wpfc == NULL)
+		return 0;
+
+	return sizeof(struct wpfc_profile);
+}
+
+static size_t dsbr_table_size(const struct dsbr_profile *dsbr)
+{
+	if (dsbr == NULL)
+		return 0;
+
+	return sizeof(struct dsbr_profile);
 }
 
 static bool valid_legacy_length(size_t bin_len)
@@ -121,7 +197,7 @@ static bool valid_legacy_length(size_t bin_len)
 	return false;
 }
 
-static int sar_header_size(void)
+static size_t sar_header_size(void)
 {
 	return (MAX_PROFILE_COUNT * sizeof(uint16_t)) + sizeof(struct sar_header);
 }
@@ -163,6 +239,15 @@ static int fill_wifi_sar_limits(union wifi_sar_limits *sar_limits, const uint8_t
 	expected_sar_bin_size += dsm_table_size(sar_limits->dsm);
 	expected_sar_bin_size += bsar_table_size(sar_limits->bsar);
 	expected_sar_bin_size += wbem_table_size(sar_limits->wbem);
+	expected_sar_bin_size += bpag_table_size(sar_limits->bpag);
+	expected_sar_bin_size += bbfb_table_size(sar_limits->bbfb);
+	expected_sar_bin_size += bdcm_table_size(sar_limits->bdcm);
+	expected_sar_bin_size += bbsm_table_size(sar_limits->bbsm);
+	expected_sar_bin_size += bucs_table_size(sar_limits->bucs);
+	expected_sar_bin_size += bdmm_table_size(sar_limits->bdmm);
+	expected_sar_bin_size += ebrd_table_size(sar_limits->ebrd);
+	expected_sar_bin_size += wpfc_table_size(sar_limits->wpfc);
+	expected_sar_bin_size += dsbr_table_size(sar_limits->dsbr);
 
 	if (sar_bin_size != expected_sar_bin_size) {
 		printk(BIOS_ERR, "Invalid SAR size, expected: %zu, obtained: %zu\n",

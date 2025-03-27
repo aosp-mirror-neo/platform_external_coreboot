@@ -22,12 +22,13 @@
 #include <soc/intel/common/vbt.h>
 #include <soc/interrupt.h>
 #include <soc/iomap.h>
-#include <soc/irq.h>
 #include <soc/itss.h>
+#include <soc/irq.h>
 #include <soc/pci_devs.h>
 #include <soc/ramstage.h>
 #include <soc/systemagent.h>
 #include <soc/usb.h>
+#include <static.h>
 #include <string.h>
 #include <types.h>
 
@@ -115,7 +116,7 @@ const char *soc_acpi_name(const struct device *dev)
 	case PCH_DEVFN_I2C1:	return "I2C1";
 	case PCH_DEVFN_I2C2:	return "I2C2";
 	case PCH_DEVFN_I2C3:	return "I2C3";
-	case PCH_DEVFN_CSE:	return "CSE1";
+	case PCH_DEVFN_CSE:	return "HECI";
 	case PCH_DEVFN_CSE_2:	return "CSE2";
 	case PCH_DEVFN_CSE_IDER:	return "CSED";
 	case PCH_DEVFN_CSE_KT:	return "CSKT";

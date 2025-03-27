@@ -90,7 +90,10 @@ static void crb_tpm_fill_ssdt(const struct device *dev)
 
 	acpi_device_write_uid(dev);
 
-	acpigen_write_STA(ACPI_STATUS_DEVICE_ALL_ON);
+	if (CONFIG(HAVE_INTEL_PTT) && ptt_active())
+		acpigen_write_STA(ACPI_STATUS_DEVICE_ALL_ON);
+	else
+		acpigen_write_STA(ACPI_STATUS_DEVICE_ALL_OFF);
 
 	/* Resources */
 	acpigen_write_name("_CRS");
@@ -207,11 +210,6 @@ static struct device_operations __maybe_unused crb_ops = {
 
 static void enable_dev(struct device *dev)
 {
-	if (crb_tis_probe(NULL) == NULL) {
-		dev->enabled = 0;
-		return;
-	}
-
 #if !DEVTREE_EARLY
 	dev->ops = &crb_ops;
 #endif

@@ -141,7 +141,8 @@ void i2c_generic_fill_ssdt(const struct device *dev,
 			config->enable_off_delay_ms,
 			&config->stop_gpio,
 			config->stop_delay_ms,
-			config->stop_off_delay_ms
+			config->stop_off_delay_ms,
+			config->use_gpio_for_status
 		};
 		acpi_device_add_power_res(&power_res_params);
 	}
@@ -149,6 +150,7 @@ void i2c_generic_fill_ssdt(const struct device *dev,
 	/* Rotation Matrix */
 	if (config->has_rotation_matrix) {
 		acpigen_write_method("ROTM", 0);
+		acpigen_write_name("RBUF");
 		acpigen_write_package(3);
 
 		for (int i = 0; i < 3; i++) {
@@ -160,8 +162,16 @@ void i2c_generic_fill_ssdt(const struct device *dev,
 
 			acpigen_write_string(matrix_row);
 		}
+		acpigen_pop_len();
+		acpigen_write_return_namestr("RBUF");
 
 		acpigen_pop_len();
+	}
+
+	/* Chip Direct Mapping */
+	if (config->cdm_index != CDM_NOT_PRESENT) {
+		acpigen_write_method("_CDM", 1);
+		acpigen_write_return_integer(0xabcd00 | config->cdm_index);
 		acpigen_pop_len();
 	}
 

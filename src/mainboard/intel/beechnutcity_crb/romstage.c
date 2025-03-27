@@ -7,8 +7,10 @@
 #include <fmap_config.h>
 #include <device/device.h>
 #include <soc/ddr.h>
+#include <soc/dimm_slot.h>
 #include <soc/iio.h>
 #include <soc/romstage.h>
+#include <static.h>
 
 #include "chip.h"
 
@@ -43,6 +45,13 @@ void mainboard_memory_init_params(FSPM_UPD *mupd)
 
 bool mainboard_dimm_slot_exists(uint8_t socket, uint8_t channel, uint8_t dimm)
 {
-	//TODO: not implemented yet
+	int size;
+	const struct dimm_slot_config *dimm_slot_config_table = get_dimm_slot_config_table(&size);
+
+	for (int i = 0; i < size; i++) {
+		if (DIMM_SLOT_EQUAL(dimm_slot_config_table[i], socket, channel, dimm))
+			return true;
+	}
+
 	return false;
 }

@@ -1,13 +1,13 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 
 #include <assert.h>
+#include <cpu/intel/cpu_ids.h>
 #include <device/device.h>
 #include <device/pci.h>
 #include <fsp/util.h>
 #include <soc/util.h>
 #include <soc/acpi.h>
 #include <soc/chip_common.h>
-#include <soc/cpu.h>
 #include <soc/pci_devs.h>
 #include <soc/soc_util.h>
 #include <stdlib.h>
@@ -134,6 +134,20 @@ uint8_t get_cxl_node_count(void)
 	return count;
 }
 
+unsigned int get_prmrr_count(void)
+{
+	uint32_t cpu_id = cpu_get_cpuid();
+
+	switch (cpu_id & CPUID_ALL_STEPPINGS_MASK) {
+	case CPUID_GRANITERAPIDS:
+		return 0x7;
+	case CPUID_SIERRAFOREST:
+		return 0x4;
+	default:
+		return 0;
+	}
+}
+
 bool is_memtype_reserved(uint16_t mem_type)
 {
 	return false;
@@ -147,4 +161,9 @@ bool is_memtype_non_volatile(uint16_t mem_type)
 bool is_memtype_processor_attached(uint16_t mem_type)
 {
 	return true;
+}
+
+bool get_mmio_high_base_size(resource_t *base, resource_t *size)
+{
+	return false;
 }

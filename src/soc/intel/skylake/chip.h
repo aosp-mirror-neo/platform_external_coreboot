@@ -201,11 +201,7 @@ struct soc_intel_skylake_config {
 	 */
 	bool PcieRpAdvancedErrorReporting[CONFIG_MAX_ROOT_PORTS];
 
-	/*
-	 * Enable/Disable Latency Tolerance Reporting for Root Port
-	 * 0: Disable LTR
-	 * 1: Enable LTR
-	 */
+	/* Enable/Disable Latency Tolerance Reporting for Root Port */
 	bool PcieRpLtrEnable[CONFIG_MAX_ROOT_PORTS];
 
 	/* Enable/Disable HotPlug support for Root Port */
@@ -459,8 +455,8 @@ struct soc_intel_skylake_config {
 	u8 SlowSlewRateForSa;
 
 	/* Enable/Disable EIST
-	 * 1b - Enabled
-	 * 0b - Disabled
+	 * true - Enabled
+	 * false - Disabled
 	 */
 	bool eist_enable;
 

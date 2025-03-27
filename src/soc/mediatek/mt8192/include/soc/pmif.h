@@ -127,7 +127,13 @@ check_member(mtk_pmif_regs, swinf_0_acc, 0xC00);
 #define PMIF_SPI_AP_CHAN	(PMIF_SPI_BASE + 0xC80)
 
 enum {
-	FREQ_260MHZ = 260,
+	PMIF_TARGET_FREQ_MHZ = 260,
+};
+
+/* calibation tolerance rate, unit: 0.1% */
+enum {
+	CAL_TOL_RATE = 40,
+	CAL_MAX_VAL = 0x7F,
 };
 
 #define FREQ_METER_ABIST_AD_OSC_CK	37

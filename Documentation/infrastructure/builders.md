@@ -23,8 +23,6 @@ as the system can just be disabled until someone is available to fix any
 issues.
 
 Currently active Jenkins admins:
-*   Patrick Georgi:
-    *   Email: [patrick@coreboot.org](mailto:patrick@coreboot.org)
 *   Martin Roth:
     *   Email: [gaumless@gmail.com](mailto:gaumless@gmail.com)
     *   IRC: martinr
@@ -93,19 +91,11 @@ You can see all the builds in the main jenkins interface:
 Most of the time on the builders is taken up by the coreboot main and
 coreboot gerrit builds.
 
-```{toctree}
-:maxdepth: 1
-
-coreboot gerrit build <https://qa.coreboot.org/job/coreboot-gerrit/>
-```
+* [coreboot gerrit build](https://qa.coreboot.org/job/coreboot-gerrit/)
 ([Time trend](https://qa.coreboot.org/job/coreboot-gerrit/buildTimeTrend))
 
 
-```{toctree}
-:maxdepth: 1
-
-coreboot main build <https://qa.coreboot.org/job/coreboot/>
-```
+* [coreboot main build](https://qa.coreboot.org/job/coreboot/)
  ([Time trend](https://qa.coreboot.org/job/coreboot/buildTimeTrend))
 
 

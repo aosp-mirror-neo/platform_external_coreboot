@@ -104,9 +104,16 @@ func (b bd82x6x) Scan(ctx Context, addr PCIDevData) {
 		pcieHotplugMap += "0 }"
 	}
 
+	pchComment := "Intel Series "
+	if b.variant == "BD82X6X" {
+		pchComment += "6 Cougar Point PCH"
+	} else {
+		pchComment += "7 Panther Point PCH"
+	}
+
 	cur := DevTreeNode{
 		Chip:    "southbridge/intel/bd82x6x",
-		Comment: "Intel Series 6 Cougar Point PCH",
+		Comment: pchComment,
 
 		Registers: map[string]string{
 			"sata_interface_speed_support": "0x3",
@@ -124,29 +131,29 @@ func (b bd82x6x) Scan(ctx Context, addr PCIDevData) {
 			"spi_lvscc":         fmt.Sprintf("0x%x", inteltool.RCBA[0x38c4]&^(1<<23)),
 		},
 		PCISlots: []PCISlot{
-			PCISlot{PCIAddr: PCIAddr{Dev: 0x14, Func: 0}, writeEmpty: false, alias: "xhci", additionalComment: "USB 3.0 Controller"},
-			PCISlot{PCIAddr: PCIAddr{Dev: 0x16, Func: 0}, writeEmpty: true, alias: "mei1", additionalComment: "Management Engine Interface 1"},
-			PCISlot{PCIAddr: PCIAddr{Dev: 0x16, Func: 1}, writeEmpty: true, alias: "mei2", additionalComment: "Management Engine Interface 2"},
-			PCISlot{PCIAddr: PCIAddr{Dev: 0x16, Func: 2}, writeEmpty: true, alias: "me_ide_r", additionalComment: "Management Engine IDE-R"},
-			PCISlot{PCIAddr: PCIAddr{Dev: 0x16, Func: 3}, writeEmpty: true, alias: "me_kt", additionalComment: "Management Engine KT"},
-			PCISlot{PCIAddr: PCIAddr{Dev: 0x19, Func: 0}, writeEmpty: true, alias: "gbe", additionalComment: "Intel Gigabit Ethernet"},
-			PCISlot{PCIAddr: PCIAddr{Dev: 0x1a, Func: 0}, writeEmpty: true, alias: "ehci2", additionalComment: "USB2 EHCI #2"},
-			PCISlot{PCIAddr: PCIAddr{Dev: 0x1b, Func: 0}, writeEmpty: true, alias: "hda", additionalComment: "High Definition Audio"},
-			PCISlot{PCIAddr: PCIAddr{Dev: 0x1c, Func: 0}, writeEmpty: true, alias: "pcie_rp1", additionalComment: "PCIe Port #1"},
-			PCISlot{PCIAddr: PCIAddr{Dev: 0x1c, Func: 1}, writeEmpty: true, alias: "pcie_rp2", additionalComment: "PCIe Port #2"},
-			PCISlot{PCIAddr: PCIAddr{Dev: 0x1c, Func: 2}, writeEmpty: true, alias: "pcie_rp3", additionalComment: "PCIe Port #3"},
-			PCISlot{PCIAddr: PCIAddr{Dev: 0x1c, Func: 3}, writeEmpty: true, alias: "pcie_rp4", additionalComment: "PCIe Port #4"},
-			PCISlot{PCIAddr: PCIAddr{Dev: 0x1c, Func: 4}, writeEmpty: true, alias: "pcie_rp5", additionalComment: "PCIe Port #5"},
-			PCISlot{PCIAddr: PCIAddr{Dev: 0x1c, Func: 5}, writeEmpty: true, alias: "pcie_rp6", additionalComment: "PCIe Port #6"},
-			PCISlot{PCIAddr: PCIAddr{Dev: 0x1c, Func: 6}, writeEmpty: true, alias: "pcie_rp7", additionalComment: "PCIe Port #7"},
-			PCISlot{PCIAddr: PCIAddr{Dev: 0x1c, Func: 7}, writeEmpty: true, alias: "pcie_rp8", additionalComment: "PCIe Port #8"},
-			PCISlot{PCIAddr: PCIAddr{Dev: 0x1d, Func: 0}, writeEmpty: true, alias: "ehci1", additionalComment: "USB2 EHCI #1"},
-			PCISlot{PCIAddr: PCIAddr{Dev: 0x1e, Func: 0}, writeEmpty: true, alias: "pci_bridge", additionalComment: "PCI bridge"},
-			PCISlot{PCIAddr: PCIAddr{Dev: 0x1f, Func: 0}, writeEmpty: true, alias: "lpc", additionalComment: "LPC bridge"},
-			PCISlot{PCIAddr: PCIAddr{Dev: 0x1f, Func: 2}, writeEmpty: true, alias: "sata1", additionalComment: "SATA Controller 1"},
-			PCISlot{PCIAddr: PCIAddr{Dev: 0x1f, Func: 3}, writeEmpty: true, alias: "smbus", additionalComment: "SMBus"},
-			PCISlot{PCIAddr: PCIAddr{Dev: 0x1f, Func: 5}, writeEmpty: true, alias: "sata2", additionalComment: "SATA Controller 2"},
-			PCISlot{PCIAddr: PCIAddr{Dev: 0x1f, Func: 6}, writeEmpty: true, alias: "thermal", additionalComment: "Thermal"},
+			PCISlot{PCIAddr: PCIAddr{Dev: 0x14, Func: 0}, writeEmpty: false, alias: "xhci"},
+			PCISlot{PCIAddr: PCIAddr{Dev: 0x16, Func: 0}, writeEmpty: true, alias: "mei1"},
+			PCISlot{PCIAddr: PCIAddr{Dev: 0x16, Func: 1}, writeEmpty: true, alias: "mei2"},
+			PCISlot{PCIAddr: PCIAddr{Dev: 0x16, Func: 2}, writeEmpty: true, alias: "me_ide_r"},
+			PCISlot{PCIAddr: PCIAddr{Dev: 0x16, Func: 3}, writeEmpty: true, alias: "me_kt"},
+			PCISlot{PCIAddr: PCIAddr{Dev: 0x19, Func: 0}, writeEmpty: true, alias: "gbe"},
+			PCISlot{PCIAddr: PCIAddr{Dev: 0x1a, Func: 0}, writeEmpty: true, alias: "ehci2"},
+			PCISlot{PCIAddr: PCIAddr{Dev: 0x1b, Func: 0}, writeEmpty: true, alias: "hda"},
+			PCISlot{PCIAddr: PCIAddr{Dev: 0x1c, Func: 0}, writeEmpty: true, alias: "pcie_rp1"},
+			PCISlot{PCIAddr: PCIAddr{Dev: 0x1c, Func: 1}, writeEmpty: true, alias: "pcie_rp2"},
+			PCISlot{PCIAddr: PCIAddr{Dev: 0x1c, Func: 2}, writeEmpty: true, alias: "pcie_rp3"},
+			PCISlot{PCIAddr: PCIAddr{Dev: 0x1c, Func: 3}, writeEmpty: true, alias: "pcie_rp4"},
+			PCISlot{PCIAddr: PCIAddr{Dev: 0x1c, Func: 4}, writeEmpty: true, alias: "pcie_rp5"},
+			PCISlot{PCIAddr: PCIAddr{Dev: 0x1c, Func: 5}, writeEmpty: true, alias: "pcie_rp6"},
+			PCISlot{PCIAddr: PCIAddr{Dev: 0x1c, Func: 6}, writeEmpty: true, alias: "pcie_rp7"},
+			PCISlot{PCIAddr: PCIAddr{Dev: 0x1c, Func: 7}, writeEmpty: true, alias: "pcie_rp8"},
+			PCISlot{PCIAddr: PCIAddr{Dev: 0x1d, Func: 0}, writeEmpty: true, alias: "ehci1"},
+			PCISlot{PCIAddr: PCIAddr{Dev: 0x1e, Func: 0}, writeEmpty: true, alias: "pci_bridge"},
+			PCISlot{PCIAddr: PCIAddr{Dev: 0x1f, Func: 0}, writeEmpty: true, alias: "lpc"},
+			PCISlot{PCIAddr: PCIAddr{Dev: 0x1f, Func: 2}, writeEmpty: true, alias: "sata1"},
+			PCISlot{PCIAddr: PCIAddr{Dev: 0x1f, Func: 3}, writeEmpty: true, alias: "smbus"},
+			PCISlot{PCIAddr: PCIAddr{Dev: 0x1f, Func: 5}, writeEmpty: true, alias: "sata2"},
+			PCISlot{PCIAddr: PCIAddr{Dev: 0x1f, Func: 6}, writeEmpty: true, alias: "thermal"},
 		},
 	}
 
@@ -181,7 +188,7 @@ func (b bd82x6x) Scan(ctx Context, addr PCIDevData) {
 
 	sb := Create(ctx, "early_init.c")
 	defer sb.Close()
-	Add_gpl(sb)
+	Add_SPDX(sb, C, GPL2_only)
 
 	sb.WriteString(`#include <bootblock_common.h>
 #include <device/pci_ops.h>
@@ -246,7 +253,7 @@ void bootblock_mainboard_early_init(void)
 	gnvs := Create(ctx, "acpi_tables.c")
 	defer gnvs.Close()
 
-	Add_gpl(gnvs)
+	Add_SPDX(gnvs, C, GPL2_only)
 	gnvs.WriteString(`#include <acpi/acpi_gnvs.h>
 #include <soc/nvs.h>
 

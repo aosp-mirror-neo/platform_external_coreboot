@@ -12,11 +12,7 @@ work to make the coreboot project successful.
 
 Major Bugfixes in this release
 ------------------------------
-```{toctree}
-:maxdepth: 1
-
-CVE-2022-29264 <https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2022-29264>
-```
+* [CVE-2022-29264](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2022-29264)
 
 
 New Mainboards
@@ -243,7 +239,7 @@ Timestamps collected by coreboot can be processed to resemble
 profiler-like output, and thus can be feed to flame graph generation
 tools.
 
-Generating flame graph using https://github.com/brendangregg/FlameGraph:
+Generating flame graph using <https://github.com/brendangregg/FlameGraph>:
 ```
    cbmem -S > trace.txt
    FlameGraph/flamegraph.pl --flamechart trace.txt > output.svg

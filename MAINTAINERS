@@ -124,6 +124,11 @@ F:	src/mainboard/51nb/
 
 
 
+ACER G43T-AM3
+R:	Julia Kittlinger <julia.kittlinger@pm.me>
+S:	Orphan
+F:	src/mainboard/acer/g43t-am3/
+
 ACER MAINBOARDS
 S:	Orphan
 F:	src/mainboard/acer/
@@ -185,6 +190,11 @@ ASROCK G41C-GS MAINBOARD & VARIANTS
 M:	Angel Pons <th3fanbus@gmail.com>
 S:	Maintained
 F:	src/mainboard/asrock/g41c-gs/
+
+ASROCK IMB-1222 MAINBOARD
+M:	Maxim Polyakov <max.senia.poliak@gmail.com>
+S:	Maintained
+F:	src/mainboard/asrock/imb-1222/
 
 ASROCK Z97 EXTREME6 MAINBOARD
 M:	Angel Pons <th3fanbus@gmail.com>
@@ -275,7 +285,10 @@ EMULATION MAINBOARDS
 S:	Orphan
 F:	src/mainboard/emulation/
 
-
+ERYING MAINBOARDS
+M:	Alicja Michalska <ahplka19@gmail.com>
+S:	Maintained
+F:	src/mainboard/erying/
 
 EXAMPLE MAINBOARDS
 S:	Orphan
@@ -337,8 +350,16 @@ M:	Nick Vaccaro <nvaccaro@chromium.org>
 M:	Eric Lai <ericllai@google.com>
 M:	Kapil Porwal <kapilporwal@google.com>
 M:	Dinesh Gehlot <digehlot@google.com>
+M:	Jayvik Desai <jayvik@google.com>
 S:	Maintained
 F:	src/mainboard/google/brya/
+
+GOOGLE FATCAT MAINBOARDS
+M:	Subrata Banik <subratabanik@google.com>
+M:	Kapil Porwal <kapilporwal@google.com>
+M:	Pranava Y N <pranavayn@google.com>
+M:	Jayvik Desai <jayvik@google.com>
+F:	src/mainboard/google/fatcat/
 
 GOOGLE HATCH MAINBOARDS
 M:	Subrata Banik <subratabanik@google.com>
@@ -386,6 +407,7 @@ F:	src/mainboard/google/corsola/
 F:	src/mainboard/google/geralt/
 F:	src/mainboard/google/kukui/
 F:	src/mainboard/google/oak/
+F:	src/mainboard/google/rauru/
 
 
 
@@ -401,6 +423,10 @@ S:	Orphan
 F:	src/mainboard/ibase/
 
 
+INTEL FROST_CREEK_CRB MAINBOARD
+M:	Yuchi Chen <yuchi.chen@intel.com>
+S:	Supported
+F:	src/mainboard/intel/frost_creek/
 
 INTEL HARCUVAR_CRB MAINBOARD
 M:	Jeff Daly <jeffd@silicom-usa.com>
@@ -597,13 +623,15 @@ F:	src/mainboard/siemens/mc_ehl/
 
 
 SIFIVE MAINBOARDS
-S:	Orphan
+M:	Maximilian Brune <maximilian.brune@9elements.com>
+S:	Maintained
 F:	src/mainboard/sifive/
 
 
 
 STAR LABS MAINBOARDS
 M:	Sean Rhodes <sean@starlabs.systems>
+M:	Matt DeVillier <matt.devillier@gmail.com>
 S:	Maintained
 F:	src/mainboard/starlabs/
 
@@ -627,6 +655,12 @@ F:	src/mainboard/system76/
 TI MAINBOARDS
 S:	Orphan
 F:	src/mainboard/ti/
+
+
+TOPTON MAINBOARDS
+M:	Alicja Michalska <ahplka19@gmail.com>
+S:	Maintained
+F:	src/mainboard/topton/
 
 
 
@@ -658,6 +692,7 @@ F:	src/mainboard/emulation/qemu-power8/
 
 RISC-V ARCHITECTURE
 M:	Ronald Minnich <rminnich@gmail.com>
+M:	Maximilian Brune <maximilian.brune@9elements.com>
 R:	Philipp Hug <philipp@hug.cx>
 S:	Maintained
 F:	src/arch/riscv/
@@ -669,6 +704,7 @@ F:	util/riscv/
 
 X86 ARCHITECTURE
 M:	Jérémy Compostella <jeremy.compostella@intel.com>
+M:	Shuo Liu <shuo.liu@intel.com>
 S:	MAINTAINED
 F:	src/arch/x86/
 F:	src/cpu/x86/
@@ -857,6 +893,7 @@ M:	Subrata Banik <subratabanik@google.com>
 M:	Nick Vaccaro <nvaccaro@chromium.org>
 M:	Kapil Porwal <kapilporwal@google.com>
 M:	Dinesh Gehlot <digehlot@google.com>
+M:	Jayvik Desai <jayvik@google.com>
 S:	Maintained
 F:	src/soc/intel/alderlake/
 
@@ -899,20 +936,35 @@ M:	Dinesh Gehlot <digehlot@google.com>
 S:	Maintained
 F:	src/soc/intel/meteorlake/
 
+INTEL PANTHERLAKE SOC
+M:	Subrata Banik <subratabanik@google.com>
+M:	Kapil Porwal <kapilporwal@google.com>
+M:	Pranava Y N <pranavayn@google.com>
+M:	Jayvik Desai <jayvik@google.com>
+S:	Maintained
+F:	src/soc/intel/pantherlake/
+
 INTEL TIGERLAKE SOC
 M:	Subrata Banik <subratabanik@google.com>
 M:	Nick Vaccaro <nvaccaro@chromium.org>
 S:	Maintained
 F:	src/soc/intel/tigerlake/
 
+INTEL Atom Snow Ridge SoC
+M:	Yuchi Chen <yuchi.chen@intel.com>
+M:	Vasiliy Khoruzhick <vasilykh@arista.com>
+S:	Maintained
+F:	src/soc/intel/common/block/imc/
+F:	src/soc/intel/common/block/systemagent-server/
+F:	src/soc/intel/snowridge/
+F:	src/vendorcode/intel/fsp/fsp2_0/snowridge/
+
 INTEL Xeon Scalable Processor Family
 M:	Jonathan Zhang <jon.zhixiong.zhang@gmail.com>
 M:	Johnny Lin <Johnny_Lin@wiwynn.com>
 M:	Tim Chu <Tim.Chu@quantatw.com>
-M:	Arthur Heymans <arthur@aheymans.xyz>
 M:	Christian Walter <christian.walter@9elements.com>
 M:	Shuo Liu <shuo.liu@intel.com>
-M:	Patrick Rudolph <patrick.rudolph@9elements.com>
 M:	Lean Sheng Tan <sheng.tan@9elements.com>
 S:	Supported
 F:	src/soc/intel/xeon_sp/
@@ -1019,6 +1071,11 @@ F:	util/docker/
 GIT
 F:	.git*
 F:	/util/gitconfig
+
+HDA DECODER
+M:	Nicholas Sudsgaard <devel+coreboot@nsudsgaard.com>
+S:	Maintained
+F:	util/hda-decoder/
 
 LINT SCRIPTS
 M:	Martin Roth <gaumless@gmail.com>

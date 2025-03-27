@@ -141,7 +141,7 @@ struct soc_intel_tigerlake_config {
 	uint32_t gen4_dec;
 
 	/* Enable S0iX support */
-	int s0ix_enable;
+	bool s0ix_enable;
 	/* S0iX: Selectively disable individual sub-states, by default all are enabled. */
 	enum lpm_state_mask LpmStateDisableMask;
 
@@ -149,13 +149,13 @@ struct soc_intel_tigerlake_config {
 	uint8_t TcssD3HotDisable;
 
 	/* Enable DPTF support */
-	int dptf_enable;
+	bool dptf_enable;
 
 	/* Deep SX enable for both AC and DC */
-	int deep_s3_enable_ac;
-	int deep_s3_enable_dc;
-	int deep_s5_enable_ac;
-	int deep_s5_enable_dc;
+	bool deep_s3_enable_ac;
+	bool deep_s3_enable_dc;
+	bool deep_s5_enable_ac;
+	bool deep_s5_enable_dc;
 
 	/* Deep Sx Configuration
 	 *  DSX_EN_WAKE_PIN       - Enable WAKE# pin
@@ -249,7 +249,7 @@ struct soc_intel_tigerlake_config {
 	uint16_t SataPortsDitoVal[8];
 
 	/* Audio related */
-	uint8_t PchHdaDspEnable;
+	bool PchHdaDspEnable;
 	uint8_t PchHdaAudioLinkHdaEnable;
 	uint8_t PchHdaAudioLinkDmicEnable[MAX_HD_AUDIO_DMIC_LINKS];
 	uint8_t PchHdaAudioLinkSspEnable[MAX_HD_AUDIO_SSP_LINKS];
@@ -277,20 +277,18 @@ struct soc_intel_tigerlake_config {
 	/* PCIe RP L1 substate */
 	enum L1_substates_control PcieRpL1Substates[CONFIG_MAX_ROOT_PORTS];
 
-	/* PCIe LTR: Enable (1) / Disable (0) */
-	uint8_t PcieRpLtrEnable[CONFIG_MAX_ROOT_PORTS];
+	/* PCIe LTR */
+	bool PcieRpLtrEnable[CONFIG_MAX_ROOT_PORTS];
 
 	/* PCIE RP Advanced Error Report: Enable (1) / Disable (0) */
 	uint8_t PcieRpAdvancedErrorReporting[CONFIG_MAX_ROOT_PORTS];
 
 	/* Gfx related */
 	uint8_t SkipExtGfxScan;
-
-	/* Enable/Disable EIST. 1b:Enabled, 0b:Disabled */
-	uint8_t eist_enable;
+	bool eist_enable;
 
 	/* Enable C6 DRAM */
-	uint8_t enable_c6dram;
+	bool enable_c6dram;
 
 	/*
 	 * SerialIO device mode selection:
@@ -504,29 +502,8 @@ struct soc_intel_tigerlake_config {
 	 *  - PM_CFG.SLP_LAN_MIN_ASST_WDTH
 	 */
 	uint8_t PchPmPwrCycDur;
-
-	/*
-	 * External Clock Gate
-	 * true = Mainboard design uses external clock gating
-	 * false = Mainboard design does not use external clock gating
-	 *
-	 */
 	bool external_clk_gated;
-
-	/*
-	 * External PHY Gate
-	 * true = Mainboard design uses external phy gating
-	 * false = Mainboard design does not use external phy gating
-	 *
-	 */
 	bool external_phy_gated;
-
-	/*
-	 * External Bypass Enable
-	 * true = Mainboard design uses external bypass rail
-	 * false = Mainboard design does not use external bypass rail
-	 *
-	 */
 	bool external_bypass;
 
 	/* i915 struct for GMA backlight control */
