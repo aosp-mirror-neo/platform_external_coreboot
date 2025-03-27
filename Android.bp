@@ -30,6 +30,7 @@ license {
 
 cc_defaults {
     name: "coreboot-tools-defaults",
+    visibility: ["//visibility:private"],
     cflags: [
         "-Werror",
         "-Wall",
