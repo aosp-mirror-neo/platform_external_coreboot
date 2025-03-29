@@ -1,6 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 
-#include <assert.h>
 #include <boardid.h>
 #include <baseboard/variants.h>
 #include <chip.h>
@@ -24,4 +23,13 @@ void variant_update_soc_chip_config(struct soc_intel_alderlake_config *config)
 const char *get_wifi_sar_cbfs_filename(void)
 {
 	return get_wifi_sar_fw_config_filename(FW_CONFIG_FIELD(WIFI_BT));
+}
+
+const char *variant_get_auxfw_version_file(void)
+{
+	if (fw_config_probe(FW_CONFIG(RETIMER, RETIMER_BYPASS)))
+		return "rts5453_retimer_bypass.hash";
+	else if (fw_config_probe(FW_CONFIG(RETIMER, RETIMER_JHL8040)))
+		return "rts5453_retimer_jhl8040.hash";
+	return NULL;
 }

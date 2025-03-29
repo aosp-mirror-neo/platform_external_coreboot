@@ -1,9 +1,11 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 
+#include <assert.h>
 #include <commonlib/bsd/helpers.h>
 #include <console/console.h>
 #include <device/device.h>
 #include <device/pci_def.h>
+#include <device/pci_ids.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -108,7 +110,7 @@ u32 dev_path_encode(const struct device *dev)
 		ret |= dev->path.apic.apic_id;
 		break;
 	case DEVICE_PATH_DOMAIN:
-		ret |= dev->path.domain.domain;
+		ret |= dev->path.domain.domain_id;
 		break;
 	case DEVICE_PATH_CPU_CLUSTER:
 		ret |= dev->path.cpu_cluster.cluster;
@@ -192,7 +194,7 @@ const char *dev_path(const struct device *dev)
 			break;
 		case DEVICE_PATH_DOMAIN:
 			snprintf(buffer, sizeof(buffer), "DOMAIN: %08x",
-				dev->path.domain.domain);
+				dev->path.domain.domain_id);
 			break;
 		case DEVICE_PATH_CPU_CLUSTER:
 			snprintf(buffer, sizeof(buffer), "CPU_CLUSTER: %01x",
@@ -229,6 +231,9 @@ const char *dev_path(const struct device *dev)
 		case DEVICE_PATH_MDIO:
 			snprintf(buffer, sizeof(buffer), "MDIO: %02x", dev->path.mdio.addr);
 			break;
+		case DEVICE_PATH_GICC_V3:
+			snprintf(buffer, sizeof(buffer), "GICV3: %02x", dev->path.gicc_v3.mpidr);
+			break;
 		default:
 			printk(BIOS_ERR, "Unknown device path type: %d\n",
 			       dev->path.type);
@@ -259,6 +264,30 @@ const struct device *dev_get_domain(const struct device *dev)
 	}
 
 	return NULL;
+}
+
+unsigned int dev_get_domain_id(const struct device *dev)
+{
+	const struct device *domain_dev = dev_get_domain(dev);
+
+	assert(domain_dev);
+
+	if (!domain_dev) {
+		printk(BIOS_ERR, "%s: doesn't have a domain device\n", dev_path(dev));
+		return 0;
+	}
+
+	return domain_dev->path.domain.domain_id;
+}
+
+bool is_domain0(const struct device *dev)
+{
+	return dev && dev->path.type == DEVICE_PATH_DOMAIN && dev->path.domain.domain_id == 0;
+}
+
+bool is_dev_on_domain0(const struct device *dev)
+{
+	return is_domain0(dev_get_domain(dev));
 }
 
 /**
@@ -518,7 +547,7 @@ const char *resource_type(const struct resource *resource)
 void report_resource_stored(struct device *dev, const struct resource *resource,
 			    const char *comment)
 {
-	char buf[10];
+	char buf[16];
 	unsigned long long base, end;
 
 	if (!(resource->flags & IORESOURCE_STORED))
@@ -626,7 +655,7 @@ void disable_children(struct bus *bus)
  * Returns true if the device is an enabled bridge that has at least
  * one enabled device on its secondary bus that is not of type NONE.
  */
-bool dev_is_active_bridge(struct device *dev)
+bool dev_is_active_bridge(const struct device *dev)
 {
 	struct device *child;
 
@@ -940,4 +969,11 @@ bool is_pci_dev_on_bus(const struct device *pci, unsigned int bus)
 bool is_pci_bridge(const struct device *pci)
 {
 	return is_pci(pci) && ((pci->hdr_type & 0x7f) == PCI_HEADER_TYPE_BRIDGE);
+}
+
+bool is_pci_ioapic(const struct device *pci)
+{
+	return is_pci(pci) && ((pci->class >> 16) == PCI_BASE_CLASS_SYSTEM) &&
+		((pci->class >> 8) == PCI_CLASS_SYSTEM_PIC) &&
+		((pci->class & 0xff) >= 0x10);
 }

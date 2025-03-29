@@ -59,9 +59,48 @@ static struct device_tree_property *alloc_prop(void)
 	return xzalloc(sizeof(struct device_tree_property));
 }
 
+
+/*
+ * internal functions used by both unflattened and flattened device tree variants
+ */
+
+
+static size_t read_reg_prop(struct fdt_property *prop, u32 addr_cells, u32 size_cells,
+			    struct device_tree_region regions[], size_t regions_count)
+{
+	// we found the reg property, no need to parse all regions in 'reg'
+	size_t count = prop->size / (4 * addr_cells + 4 * size_cells);
+	if (count > regions_count) {
+		printk(BIOS_ERR, "reg property has more entries (%zd) than regions array can hold (%zd)\n", count, regions_count);
+		count = regions_count;
+	}
+	if (addr_cells > 2 || size_cells > 2) {
+		printk(BIOS_ERR, "addr_cells (%d) or size_cells (%d) bigger than 2\n",
+				  addr_cells, size_cells);
+		return 0;
+	}
+	uint32_t *ptr = prop->data;
+	for (int i = 0; i < count; i++) {
+		if (addr_cells == 1)
+			regions[i].addr = be32dec(ptr);
+		else if (addr_cells == 2)
+			regions[i].addr = be64dec(ptr);
+		ptr += addr_cells;
+		if (size_cells == 1)
+			regions[i].size = be32dec(ptr);
+		else if (size_cells == 2)
+			regions[i].size = be64dec(ptr);
+		ptr += size_cells;
+	}
+
+	return count; // return the number of regions found in the reg property
+}
+
+
 /*
  * Functions for picking apart flattened trees.
  */
+
 
 static int fdt_skip_nops(const void *blob, uint32_t offset)
 {
@@ -203,32 +242,7 @@ u32 fdt_read_reg_prop(const void *blob, u32 node_offset, u32 addr_cells, u32 siz
 		return 0;
 	}
 
-	// we found the reg property, now need to parse all regions in 'reg'
-	size_t count = prop.size / (4 * addr_cells + 4 * size_cells);
-	if (count > regions_count) {
-		printk(BIOS_ERR, "reg property at node_offset: %x has more entries (%zd) than regions array can hold (%zd)\n", node_offset, count, regions_count);
-		count = regions_count;
-	}
-	if (addr_cells > 2 || size_cells > 2) {
-		printk(BIOS_ERR, "addr_cells (%d) or size_cells (%d) bigger than 2\n",
-				  addr_cells, size_cells);
-		return 0;
-	}
-	uint32_t *ptr = prop.data;
-	for (int i = 0; i < count; i++) {
-		if (addr_cells == 1)
-			regions[i].addr = be32dec(ptr);
-		else if (addr_cells == 2)
-			regions[i].addr = be64dec(ptr);
-		ptr += addr_cells;
-		if (size_cells == 1)
-			regions[i].size = be32dec(ptr);
-		else if (size_cells == 2)
-			regions[i].size = be64dec(ptr);
-		ptr += size_cells;
-	}
-
-	return count; // return the number of regions found in the reg property
+	return read_reg_prop(&prop, addr_cells, size_cells, regions, regions_count);
 }
 
 static u32 fdt_read_cell_props(const void *blob, u32 node_offset, u32 *addrcp, u32 *sizecp)
@@ -400,18 +414,14 @@ size_t fdt_find_subnodes_by_prefix(const void *blob, u32 node_offset, const char
 	// walk all children nodes of offset
 	while ((size = fdt_next_node_name(blob, offset, &node_name))) {
 
-		if (count_results >= results_len) {
-			printk(BIOS_WARNING,
-				"%s: results_len (%zd) smaller than count_results (%zd)\n",
-				__func__, results_len, count_results);
+		// check if there is space left in the results array
+		if (count_results >= results_len)
 			break;
-		}
 
 		if (!strncmp(prefix, node_name, prefix_len)) {
 			// we found a node that matches the prefix
 			results[count_results++] = offset;
 		}
-
 		// node does not match the prefix. skip current node
 		offset += fdt_skip_node(blob, offset);
 	}
@@ -925,11 +935,10 @@ void dt_flatten(const struct device_tree *tree, void *start_dest)
 
 	uint8_t *struct_start = dest;
 	header->structure_offset = htobe32(dest - (uint8_t *)start_dest);
+	be32enc(&dest[struct_size], FDT_TOKEN_END);
+	struct_size += sizeof(uint32_t);
 	header->structure_size = htobe32(struct_size);
 	dest += struct_size;
-
-	*((uint32_t *)dest) = htobe32(FDT_TOKEN_END);
-	dest += sizeof(uint32_t);
 
 	uint8_t *strings_start = dest;
 	header->strings_offset = htobe32(dest - (uint8_t *)start_dest);
@@ -981,6 +990,37 @@ void dt_print_node(const struct device_tree_node *node)
  */
 
 /*
+ * dt_read_reg_prop reads the reg property inside a node
+ *
+ * @params node           device tree node to read reg property from
+ * @params addr_cells     number of cells used for one address
+ * @params size_cells     number of cells used for one size
+ * @params regions        all regions that are read inside the reg property are saved inside
+ *                        this array
+ * @params regions_count  maximum number of entries that can be saved inside the regions array.
+ *
+ * Returns: Either 0 on error or returns the number of regions put into the regions array.
+ */
+size_t dt_read_reg_prop(struct device_tree_node *node, u32 addr_cells, u32 size_cells,
+			struct device_tree_region regions[], size_t regions_count)
+{
+	struct device_tree_property *prop;
+	bool found = false;
+	list_for_each(prop, node->properties, list_node) {
+		if (!strcmp("reg", prop->prop.name)) {
+			found = true;
+			break;
+		}
+	}
+
+	if (!found) {
+		printk(BIOS_DEBUG, "no reg property found\n");
+		return 0;
+	}
+	return read_reg_prop(&prop->prop, addr_cells, size_cells, regions, regions_count);
+}
+
+/*
  * Read #address-cells and #size-cells properties from a node.
  *
  * @param node		The device tree node to read from.
@@ -999,31 +1039,19 @@ void dt_read_cell_props(const struct device_tree_node *node, u32 *addrcp,
 	}
 }
 
-/*
- * Find a node from a device tree path, relative to a parent node.
- *
- * @param parent	The node from which to start the relative path lookup.
- * @param path		An array of path component strings that will be looked
- *			up in order to find the node. Must be terminated with
- *			a NULL pointer. Example: {'firmware', 'coreboot', NULL}
- * @param addrcp	Pointer that will be updated with any #address-cells
- *			value found in the path. May be NULL to ignore.
- * @param sizecp	Pointer that will be updated with any #size-cells
- *			value found in the path. May be NULL to ignore.
- * @param create	1: Create node(s) if not found. 0: Return NULL instead.
- * @return		The found/created node, or NULL.
- */
-struct device_tree_node *dt_find_node(struct device_tree_node *parent,
-				      const char **path, u32 *addrcp,
-				      u32 *sizecp, int create)
+static struct device_tree_node *_dt_find_node(struct device_tree_node *parent,
+					      const char **path, u32 *addrcp,
+					      u32 *sizecp, int create)
 {
 	struct device_tree_node *node, *found = NULL;
 
-	/* Update #address-cells and #size-cells for this level. */
-	dt_read_cell_props(parent, addrcp, sizecp);
-
 	if (!*path)
 		return parent;
+
+	/* Update #address-cells and #size-cells for the parent level (cells
+	   properties always count for the direct children of their node). */
+	if (addrcp || sizecp)
+		dt_read_cell_props(parent, addrcp, sizecp);
 
 	/* Find the next node in the path, if it exists. */
 	list_for_each(node, parent->children, list_node) {
@@ -1046,7 +1074,35 @@ struct device_tree_node *dt_find_node(struct device_tree_node *parent,
 		list_insert_after(&found->list_node, &parent->children);
 	}
 
-	return dt_find_node(found, path + 1, addrcp, sizecp, create);
+	return _dt_find_node(found, path + 1, addrcp, sizecp, create);
+}
+
+/*
+ * Find a node from a device tree path, relative to a parent node.
+ *
+ * @param parent	The node from which to start the relative path lookup.
+ * @param path		An array of path component strings that will be looked
+ *			up in order to find the node. Must be terminated with
+ *			a NULL pointer. Example: {'firmware', 'coreboot', NULL}
+ * @param addrcp	Pointer that will be updated with any #address-cells
+ *			value found in the path. May be NULL to ignore.
+ * @param sizecp	Pointer that will be updated with any #size-cells
+ *			value found in the path. May be NULL to ignore.
+ * @param create	1: Create node(s) if not found. 0: Return NULL instead.
+ * @return		The found/created node, or NULL.
+ */
+struct device_tree_node *dt_find_node(struct device_tree_node *parent,
+				      const char **path, u32 *addrcp,
+				      u32 *sizecp, int create)
+{
+	/* Initialize cells to default values according to FDT spec. */
+	if (addrcp)
+		*addrcp = 2;
+
+	if (sizecp)
+		*sizecp = 1;
+
+	return _dt_find_node(parent, path, addrcp, sizecp, create);
 }
 
 /*
@@ -1080,7 +1136,8 @@ struct device_tree_node *dt_find_node_by_path(struct device_tree *tree,
 
 	if (path[0] == '/') { /* regular path */
 		if (path[1] == '\0') {	/* special case: "/" is root node */
-			dt_read_cell_props(tree->root, addrcp, sizecp);
+			if (addrcp || sizecp)
+				dt_read_cell_props(tree->root, addrcp, sizecp);
 			return tree->root;
 		}
 

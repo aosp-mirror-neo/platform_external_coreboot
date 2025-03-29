@@ -2,7 +2,6 @@
 
 #include <acpi/acpigen.h>
 #include <acpi/acpigen_pci.h>
-#include <assert.h>
 #include <intelblocks/acpi.h>
 #include <intelblocks/pcr.h>
 #include <intelblocks/itss.h>
@@ -11,7 +10,6 @@
 #include <soc/numa.h>
 #include <soc/soc_util.h>
 #include <soc/util.h>
-#include <soc/itss.h>
 #include <soc/pcr_ids.h>
 
 int soc_madt_sci_irq_polarity(int sci)
@@ -84,6 +82,9 @@ void soc_pci_domain_fill_ssdt(const struct device *domain)
 
 	acpigen_write_name("_PXM");
 	acpigen_write_integer(device_to_pd(domain));
+
+	/* _PRT */
+	acpigen_write_PRT_pre_routed(domain);
 
 	/* _OSC */
 	acpigen_write_OSC_pci_domain_fixed_caps(domain,

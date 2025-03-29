@@ -69,8 +69,10 @@ endif
 ifneq ($(CONFIG_EDK2_SERIAL_SUPPORT),y)
 BUILD_STR += -D DISABLE_SERIAL_TERMINAL=TRUE
 endif
+# VARIABLE_SUPPORT		= EMU
 # MAX_VARIABLE_SIZE		= 0x10000
 ifeq ($(CONFIG_SMMSTORE_V2),y)
+BUILD_STR += -D VARIABLE_SUPPORT=SMMSTORE
 BUILD_STR += --pcd gEfiMdeModulePkgTokenSpaceGuid.PcdMaxVariableSize=0x8000
 endif
 # PCIE_BASE_ADDRESS		= 0
@@ -177,7 +179,7 @@ $(EDK2_PLATFORMS_PATH): $(WORKSPACE)
 		git clone --recurse-submodules $(CONFIG_EDK2_PLATFORMS_REPOSITORY) $(EDK2_PLATFORMS_PATH) -j5; \
 	fi
 	cd $(EDK2_PLATFORMS_PATH); \
-		if ! git rev-parse --verify -q $(CONFIG_EDK2_PLATFORMS_TAG_OR_REV) >/dev/null; then \
+		if ! git rev-parse --verify -q $(CONFIG_EDK2_PLATFORMS_TAG_OR_REV)^{object} >/dev/null; then \
 			echo "    $(CONFIG_EDK2_PLATFORMS_TAG_OR_REV) is not a valid git reference"; \
 			exit 1; \
 		fi; \
@@ -200,7 +202,7 @@ $(EDK2_PATH): $(WORKSPACE)
 		fi; \
 		echo "    Fetching new commits from $(CONFIG_EDK2_REPOSITORY)"; \
 		git fetch origin 2>/dev/null; \
-		if ! git rev-parse --verify -q $(CONFIG_EDK2_TAG_OR_REV) >/dev/null; then \
+		if ! git rev-parse --verify -q $(CONFIG_EDK2_TAG_OR_REV)^{object} >/dev/null; then \
 			echo "    $(CONFIG_EDK2_TAG_OR_REV) is not a valid git reference"; \
 			exit 1; \
 		fi; \
@@ -222,7 +224,7 @@ logo: $(EDK2_PATH)
 			BMP3:$(EDK2_PATH)/MdeModulePkg/Logo/Logo.bmp;; \
 	esac \
 
-gop_driver:
+gop_driver: $(EDK2_PATH)
 	if [ -n "$(CONFIG_EDK2_GOP_DRIVER)" ]; then \
 		echo "Using GOP driver $(CONFIG_EDK2_GOP_FILE)"; \
 		cp $(top)/$(CONFIG_EDK2_GOP_FILE) $(EDK2_PATH)/UefiPayloadPkg/IntelGopDriver.efi; \

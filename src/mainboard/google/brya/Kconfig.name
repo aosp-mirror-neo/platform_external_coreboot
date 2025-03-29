@@ -38,6 +38,9 @@ config BOARD_GOOGLE_CONSTITUTION
 config BOARD_GOOGLE_CROTA
 	bool "->  Crota"
 
+config BOARD_GOOGLE_DIRKS
+	bool "->  Dirks"
+
 config BOARD_GOOGLE_DOCHI
 	bool "->  Dochi"
 
@@ -64,6 +67,9 @@ config BOARD_GOOGLE_GLASSWAY
 
 config BOARD_GOOGLE_GOTHRAX
 	bool "->  Gothrax"
+
+config BOARD_GOOGLE_GUREN
+	bool "->  Guren"
 
 config BOARD_GOOGLE_HADES
 	bool "->  Hades"
@@ -92,6 +98,9 @@ config BOARD_GOOGLE_MITHRAX
 config BOARD_GOOGLE_MOLI
 	bool "->  Moli"
 
+config BOARD_GOOGLE_MOXIE
+	bool "->  Moxie"
+
 config BOARD_GOOGLE_NIVVIKS
 	bool "->  Nivviks"
 
@@ -116,8 +125,14 @@ config BOARD_GOOGLE_PRIMUS
 config BOARD_GOOGLE_PUJJO
 	bool "->  Pujjo"
 
+config BOARD_GOOGLE_PUJJONIRU
+	bool "->  Pujjoniru"
+
 config BOARD_GOOGLE_QUANDISO
 	bool "->  Quandiso"
+
+config BOARD_GOOGLE_QUANDISO2
+	bool "->  Quandiso2"
 
 config BOARD_GOOGLE_REDRIX
 	bool "->  Redrix"
@@ -127,6 +142,9 @@ config BOARD_GOOGLE_REDRIX4ES
 
 config BOARD_GOOGLE_RIVEN
 	bool "->  Riven"
+
+config BOARD_GOOGLE_RULL
+	bool "->  Rull"
 
 config BOARD_GOOGLE_SKOLAS
 	bool "->  Skolas"
@@ -143,6 +161,9 @@ config BOARD_GOOGLE_TAEKO4ES
 config BOARD_GOOGLE_TANIKS
 	bool "->  Taniks"
 
+config BOARD_GOOGLE_TELIKS
+	bool "->  Teliks"
+
 config BOARD_GOOGLE_TEREID
 	bool "->  Tereid"
 
@@ -154,6 +175,9 @@ config BOARD_GOOGLE_TRULO
 
 config BOARD_GOOGLE_ULDREN
 	bool "->  Uldren"
+
+config BOARD_GOOGLE_ULDRENITE
+	bool "->  Uldrenite"
 
 config BOARD_GOOGLE_VELL
 	bool "->  Vell"
@@ -191,5 +215,14 @@ config BOARD_GOOGLE_SUNDANCE
 config BOARD_GOOGLE_PUJJOGA
 	bool "->  Pujjoga"
 
+config BOARD_GOOGLE_PUJJOGATWIN
+	bool "->  Pujjogatwin"
+
 config BOARD_GOOGLE_ORISA
 	bool "->  Orisa"
+
+config BOARD_GOOGLE_TELITH
+	bool "->  Telith"
+
+config BOARD_GOOGLE_MELIKS
+	bool "->  Meliks"

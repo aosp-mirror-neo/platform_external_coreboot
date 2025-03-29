@@ -60,35 +60,6 @@ void cse_log_ro_write_protection_info(bool mfg_mode)
 		printk(BIOS_ERR, "ME: Write protection for CSE RO is not enabled\n");
 }
 
-enum cb_err cse_get_boot_performance_data(struct cse_boot_perf_rsp *boot_perf_rsp)
-{
-	struct cse_boot_perf_req {
-		struct mkhi_hdr hdr;
-		uint32_t reserved;
-	} __packed;
-
-	struct cse_boot_perf_req req = {
-		.hdr.group_id = MKHI_GROUP_ID_BUP_COMMON,
-		.hdr.command = MKHI_BUP_COMMON_GET_BOOT_PERF_DATA,
-		.reserved = 0,
-	};
-
-	size_t resp_size = sizeof(struct cse_boot_perf_rsp);
-
-	if (heci_send_receive(&req, sizeof(req), boot_perf_rsp, &resp_size,
-									HECI_MKHI_ADDR)) {
-		printk(BIOS_ERR, "cse_lite: Could not get boot performance data\n");
-		return CB_ERR;
-	}
-
-	if (boot_perf_rsp->hdr.result) {
-		printk(BIOS_ERR, "cse_lite: Get boot performance data resp failed: %d\n",
-				boot_perf_rsp->hdr.result);
-		return CB_ERR;
-	}
-
-	return CB_SUCCESS;
-}
 
 static const struct cse_bp_info *cse_get_bp_info_from_rsp(void)
 {
@@ -769,6 +740,21 @@ static enum cb_err get_cse_ver_from_cbfs(struct fw_version *cbfs_rw_version)
 	return CB_SUCCESS;
 }
 
+static bool is_cse_sync_enforced(void)
+{
+	/*
+	 * Force test CSE firmware update scenario if below conditions are being met:
+	 *  - VB2_GBB_FLAG_FORCE_CSE_SYNC flag is set
+	 *  - CSE FW is in RO
+	 */
+	struct vb2_context *ctx = vboot_get_context();
+	if ((vb2api_gbb_get_flags(ctx) & VB2_GBB_FLAG_FORCE_CSE_SYNC) &&
+		 cse_get_current_bp() == RO) {
+		return true;
+	}
+	return false;
+}
+
 static enum cse_update_status cse_check_update_status(struct region_device *target_rdev)
 {
 	int ret;
@@ -787,12 +773,18 @@ static enum cse_update_status cse_check_update_status(struct region_device *targ
 			cbfs_rw_version.build);
 
 	ret = cse_compare_sub_part_version(&cbfs_rw_version, cse_get_rw_version());
-	if (ret == 0)
+	if (ret == 0) {
+		if (is_cse_sync_enforced()) {
+			printk(BIOS_WARNING, "Force CSE Firmware upgrade for Autotest\n");
+			return CSE_UPDATE_UPGRADE;
+		}
 		return CSE_UPDATE_NOT_REQUIRED;
-	else if (ret < 0)
-		return CSE_UPDATE_DOWNGRADE;
-	else
-		return CSE_UPDATE_UPGRADE;
+	} else {
+		if (ret < 0)
+			return CSE_UPDATE_DOWNGRADE;
+		else
+			return CSE_UPDATE_UPGRADE;
+	}
 }
 
 static enum cb_err cse_write_rw_region(const struct region_device *target_rdev,
@@ -814,6 +806,8 @@ static enum cb_err cse_write_rw_region(const struct region_device *target_rdev,
 		return CB_ERR;
 
 	printk(BIOS_INFO, "cse_lite: CSE RW Update Successful\n");
+	elog_add_event_byte(ELOG_TYPE_FW_CSE_SYNC, ENV_RAMSTAGE ? ELOG_FW_POST_RAM_CSE_SYNC :
+						 ELOG_FW_PRE_RAM_CSE_SYNC);
 	return CB_SUCCESS;
 }
 
@@ -1042,7 +1036,24 @@ bool is_cse_fw_update_required(void)
 	if (get_cse_ver_from_cbfs(&cbfs_rw_version) == CB_ERR)
 		return false;
 
+	/* Check if CSE sync is enforced */
+	if (is_cse_sync_enforced()) {
+		return true;
+	}
 	return !!cse_compare_sub_part_version(&cbfs_rw_version, cse_get_rw_version());
+}
+
+bool is_cse_boot_to_rw(void)
+{
+	if (cse_get_bp_info() != CB_SUCCESS) {
+		printk(BIOS_ERR, "cse_lite: Failed to get CSE boot partition info\n");
+		return false;
+	}
+
+	if (cse_get_current_bp() == RW)
+		return true;
+
+	return false;
 }
 
 static uint8_t cse_fw_update(void)
@@ -1558,7 +1569,7 @@ static void ramstage_cse_misc_ops(void *unused)
 	 * Store the ISH RW Firmware Version into CBMEM if ISH partition
 	 * is available
 	 */
-	if (soc_is_ish_partition_enabled())
+	if (!CONFIG(DRIVER_INTEL_ISH_HAS_MAIN_FW) && soc_is_ish_partition_enabled())
 		store_ish_version();
 }
 

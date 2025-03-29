@@ -12,14 +12,28 @@ import (
 	"bytes"
 )
 
-func TryRunAndSave(output string, name string, arg []string) error {
-	cmd := exec.Command(name, arg...)
+type LogMakingProgram struct {
+	name string
+	prefixes []string
+	args []string
+}
 
+func ExecCommand(sudo bool, name string, arg []string) *exec.Cmd {
+	if sudo {
+		return exec.Command("sudo", append([]string{name}, arg...)...)
+	} else {
+		return exec.Command(name, arg...)
+	}
+}
+
+func (prog LogMakingProgram) TryRunAndSave(output string, sudo bool, prefix string) error {
 	f, err := os.Create(output)
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer f.Close()
 
+	cmd := ExecCommand(sudo, prefix+prog.name, prog.args)
 	cmd.Stdout = f
 	cmd.Stderr = f
 
@@ -27,25 +41,35 @@ func TryRunAndSave(output string, name string, arg []string) error {
 	if err != nil {
 		return err
 	}
-	cmd.Wait()
-	return nil
+	return cmd.Wait()
 }
 
-func RunAndSave(output string, name string, arg ...string) {
-	err := TryRunAndSave(output, name, arg)
-	if err == nil {
-		return
+func (prog LogMakingProgram) RunAndSave(outDir string, sudo bool) {
+	output := fmt.Sprintf("%s/%s.log", outDir, prog.name)
+	cmdline := strings.Join(append([]string{prog.name}, prog.args...), " ")
+
+	fmt.Println("Running: "+cmdline)
+
+	var sb strings.Builder
+	for _, prefix := range prog.prefixes {
+		err := prog.TryRunAndSave(output, sudo, prefix)
+		if err == nil {
+			return
+		}
+		sb.WriteString("\nError running '"+prefix+cmdline+"': "+err.Error()+"\n")
+		data, ferr := os.ReadFile(output)
+		if ferr != nil {
+			sb.WriteString("<failed to open log>\n")
+		} else {
+			if len(data) > 0 {
+				sb.WriteString("Program output:\n\n")
+				sb.WriteString(string(data))
+			}
+		}
 	}
-	idx := strings.LastIndex(name, "/")
-	relname := name
-	if idx >= 0 {
-		relname = name[idx+1:]
-	}
-	relname = "./" + relname
-	err = TryRunAndSave(output, relname, arg)
-	if err != nil {
-		log.Fatal(err)
-	}
+
+	fmt.Println("\nCould not run program: '"+cmdline+"'")
+	log.Fatal(sb.String())
 }
 
 const MAXPROMPTRETRY = 3
@@ -140,11 +164,14 @@ func MakeHDALogs(outDir string, cardName string) {
 
 func MakeLogs(outDir string) {
 	os.MkdirAll(outDir, 0700)
-	RunAndSave(outDir+"/lspci.log", "lspci", "-nnvvvxxxx")
-	RunAndSave(outDir+"/dmidecode.log", "dmidecode")
-	RunAndSave(outDir+"/acpidump.log", "acpidump")
 
-	probeGFX := PromptUserBool("WARNING: The following tool MAY cause your system to hang when it attempts "+
+	sudo := PromptUserBool("Should autoport use sudo to run the commands to make the logs? "+
+		"This is recommended over running autoport as root, since the generated files "+
+		"won't be owned by root. If running as root already because sudo isn't available, "+
+		"choose 'no'. Otherwise, run autoport as a regular (non-root) user and choose 'yes'.",
+		true)
+
+	probeGFX := PromptUserBool("WARNING: Running inteltool MAY cause your system to hang when it attempts "+
 		"to probe for graphics registers.  Having the graphics registers will help create a better port. "+
 		"Should autoport probe these registers?",
 		true)
@@ -154,9 +181,43 @@ func MakeLogs(outDir string) {
 		inteltoolArgs += "f"
 	}
 
-	RunAndSave(outDir+"/inteltool.log", "../inteltool/inteltool", inteltoolArgs)
-	RunAndSave(outDir+"/ectool.log", "../ectool/ectool", "-pd")
-	RunAndSave(outDir+"/superiotool.log", "../superiotool/superiotool", "-ade")
+	var programs = []LogMakingProgram {
+		LogMakingProgram {
+			name: "lspci",
+			prefixes: []string{""},
+			args: []string{"-nnvvvxxxx"},
+		},
+		LogMakingProgram {
+			name: "dmidecode",
+			prefixes: []string{""},
+			args: []string{},
+		},
+		LogMakingProgram {
+			name: "acpidump",
+			prefixes: []string{""},
+			args: []string{},
+		},
+		LogMakingProgram {
+			name: "inteltool",
+			prefixes: []string{"../inteltool/", ""},
+			args: []string{inteltoolArgs},
+		},
+		LogMakingProgram {
+			name: "ectool",
+			prefixes: []string{"../ectool/", ""},
+			args: []string{"-pd"},
+		},
+		LogMakingProgram {
+			name: "superiotool",
+			prefixes: []string{"../superiotool/", ""},
+			args: []string{"-ade"},
+		},
+	}
+
+	fmt.Println("Making logs...")
+	for _, prog := range programs {
+		prog.RunAndSave(outDir, sudo)
+	}
 
 	SysSound := "/sys/class/sound/"
 	card := ""

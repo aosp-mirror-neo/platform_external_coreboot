@@ -195,29 +195,11 @@ config SOC_INTEL_CSE_FMAP_NAME
 	help
 	 Name of CSE region in FMAP
 
-config SOC_INTEL_CSE_RW_A_FMAP_NAME
-	string "Location of CSE RW A in FMAP" if SOC_INTEL_CSE_RW_UPDATE
-	default "ME_RW_A"
-	help
-	 Name of CSE RW A region in FMAP
-
-config SOC_INTEL_CSE_RW_B_FMAP_NAME
-	string "Location of CSE RW B in FMAP" if SOC_INTEL_CSE_RW_UPDATE
-	default "ME_RW_B"
-	help
-	 Name of CSE RW B region in FMAP
-
 config SOC_INTEL_CSE_RW_CBFS_NAME
 	string "CBFS entry name for CSE RW blob" if SOC_INTEL_CSE_RW_UPDATE
 	default "me_rw"
 	help
 	 CBFS entry name for Intel CSE CBFS RW blob
-
-config SOC_INTEL_CSE_RW_HASH_CBFS_NAME
-	string "CBFS name for CSE RW hash file" if SOC_INTEL_CSE_RW_UPDATE
-	default "me_rw.hash"
-	help
-	 CBFS name for Intel CSE CBFS RW hash file
 
 config SOC_INTEL_CSE_RW_VERSION_CBFS_NAME
 	string "CBFS name for CSE RW version file" if SOC_INTEL_CSE_RW_UPDATE
@@ -294,7 +276,7 @@ config SOC_INTEL_CSE_LITE_COMPRESS_ME_RW
 
 config SOC_INTEL_CSE_PRE_CPU_RESET_TELEMETRY
 	def_bool n
-	depends on SOC_INTEL_CSE_LITE_SKU && !SOC_INTEL_CSE_LITE_SYNC_BY_PAYLOAD
+	depends on !SOC_INTEL_CSE_LITE_SYNC_BY_PAYLOAD
 	help
 	  Mainboard user to select this Kconfig in order to capture pre-cpu
 	  reset boot performance telemetry data.
@@ -312,6 +294,13 @@ config SOC_INTEL_CSE_PRE_CPU_RESET_TELEMETRY_V2
 	help
 	  This config will make mainboard use version 2 of the CSE timestamp
 	  definitions, it can be used for Meteor Lake M/P.
+
+config SOC_INTEL_CSE_PRE_CPU_RESET_TELEMETRY_V3
+	bool
+	select SOC_INTEL_CSE_PRE_CPU_RESET_TELEMETRY
+	help
+	  This config will make mainboard use version 3 of the CSE timestamp
+	  definitions, it can be used for Panther Lake U/H.
 
 config SOC_INTEL_CSE_LITE_SYNC_IN_ROMSTAGE
 	bool
@@ -372,6 +361,15 @@ config SOC_INTEL_COMMON_BLOCK_ME_SPEC_18
 	  This config will enable 'ME specification version 18'. It will ensure ME specific
 	  declaration and uses of required data structures for Host firmware status registers.
 
+config SOC_INTEL_COMMON_BLOCK_ME_SPEC_21
+	bool
+	select SOC_INTEL_CSE_HAVE_SPEC_SUPPORT
+	help
+	  This config will enable 'ME specification version 21'. It will ensure ME specific
+	  declaration and uses of required data structures for Host firmware status registers.
+	  This version of ME is compatible with ME version 18 in terms of Host firmware
+	  status registers.
+
 if SOC_INTEL_CSE_HAVE_SPEC_SUPPORT
 
 config ME_SPEC
@@ -380,7 +378,7 @@ config ME_SPEC
 	default 13 if SOC_INTEL_COMMON_BLOCK_ME_SPEC_13
 	default 15 if SOC_INTEL_COMMON_BLOCK_ME_SPEC_15
 	default 16 if SOC_INTEL_COMMON_BLOCK_ME_SPEC_16
-	default 18 if SOC_INTEL_COMMON_BLOCK_ME_SPEC_18
+	default 18 if SOC_INTEL_COMMON_BLOCK_ME_SPEC_18 || SOC_INTEL_COMMON_BLOCK_ME_SPEC_21
 	help
 	  This config holds the ME spec version if defined.
 

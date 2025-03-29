@@ -27,8 +27,8 @@ chip soc/intel/cannonlake
 	# USB2 PHY Power gating
 	register "PchUsb2PhySusPgDisable" = "1"
 
-	register "s0ix_enable" = "1"
-	register "dptf_enable" = "1"
+	register "s0ix_enable" = "true"
+	register "dptf_enable" = "true"
 	register "satapwroptimize" = "1"
 	register "power_limits_config" = "{
 		.tdp_pl1_override = 25,
@@ -182,19 +182,19 @@ chip soc/intel/cannonlake
 	}"
 
 	# PCIe port 10 for M.2 2230 WLAN
-	register "PcieRpEnable[9]" = "1"
+	register "PcieRpEnable[9]" = "true"
 	register "PcieClkSrcUsage[2]" = "9"
 	register "PcieClkSrcClkReq[2]" = "2"
 
 	# PCIe port 11 for card reader
-	register "PcieRpEnable[10]" = "1"
-	register "PcieRpLtrEnable[10]" = "1"
+	register "PcieRpEnable[10]" = "true"
+	register "PcieRpLtrEnable[10]" = "true"
 	register "PcieClkSrcUsage[1]" = "10"
 	register "PcieClkSrcClkReq[1]" = "1"
 
 	# PCIe port 13 for M.2 2280 SSD
-	register "PcieRpEnable[12]" = "1"
-	register "PcieRpLtrEnable[12]" = "1"
+	register "PcieRpEnable[12]" = "true"
+	register "PcieRpLtrEnable[12]" = "true"
 	register "PcieClkSrcUsage[4]" = "12"
 	register "PcieClkSrcClkReq[4]" = "4"
 

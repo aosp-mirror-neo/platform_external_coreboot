@@ -20,6 +20,7 @@
 #include <security/memory/memory.h>
 #include <cbmem.h>
 #include <acpi/acpi.h>
+#include <drivers/efi/capsules.h>
 
 /* Helper to find free space for memset_pae. */
 static uintptr_t get_free_memory_range(struct memranges *mem,
@@ -60,6 +61,9 @@ static void clear_memory(void *unused)
 	if (acpi_is_wakeup_s3())
 		return;
 
+	/* Process capsules before clearing memory and only if not waking up from S3. */
+	efi_parse_capsules();
+
 	if (!security_clear_dram_request())
 		return;
 
@@ -74,12 +78,13 @@ static void clear_memory(void *unused)
 			BM_MEM_RAM);
 
 	/* Add reserved entries */
-	void *baseptr = NULL;
-	size_t size = 0;
+	void *baseptr;
+	size_t size;
 
 	/* Only skip CBMEM, stage program, stack and heap are included there. */
 
-	cbmem_get_region(&baseptr, &size);
+	if (cbmem_get_region(&baseptr, &size))
+		die("Could not find cbmem region");
 	memranges_insert(&mem, (uintptr_t)baseptr, size, BM_MEM_TABLE);
 
 	if (ENV_X86) {

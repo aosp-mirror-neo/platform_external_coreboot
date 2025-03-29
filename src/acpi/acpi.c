@@ -138,6 +138,8 @@ static void acpi_create_madt(acpi_header_t *header, void *unused)
 	acpi_madt_t *madt = (acpi_madt_t *)header;
 	unsigned long current = (unsigned long)madt + sizeof(acpi_madt_t);
 
+	memset(madt, 0, sizeof(*madt));
+
 	if (acpi_fill_header(header, "APIC", MADT, sizeof(acpi_madt_t)) != CB_SUCCESS)
 		return;
 
@@ -256,6 +258,10 @@ static void acpi_create_tpm2(acpi_header_t *header, void *unused)
 	if (tlcl_get_family() != TPM_2)
 		return;
 
+	if (CONFIG(CRB_TPM) && !(CONFIG(SPI_TPM) || CONFIG(I2C_TPM) || CONFIG(MEMORY_MAPPED_TPM)))
+		if (!crb_tpm_is_active())
+			return;
+
 	acpi_tpm2_t *tpm2 = (acpi_tpm2_t *)header;
 	u32 tpm2_log_len;
 	void *lasa;
@@ -273,7 +279,7 @@ static void acpi_create_tpm2(acpi_header_t *header, void *unused)
 
 	/* Hard to detect for coreboot. Just set it to 0 */
 	tpm2->platform_class = 0;
-	if (CONFIG(CRB_TPM) && crb_tpm_is_active()) {
+	if (CONFIG(CRB_TPM)) {
 		/* Must be set to 7 for CRB Support */
 		tpm2->control_area = CONFIG_CRB_TPM_BASE_ADDRESS + 0x40;
 		tpm2->start_method = 7;
@@ -304,7 +310,10 @@ static void acpi_ssdt_write_cbtable(void)
 	acpigen_write_device("CTBL");
 	acpigen_write_coreboot_hid(COREBOOT_ACPI_ID_CBTABLE);
 	acpigen_write_name_integer("_UID", 0);
-	acpigen_write_STA(ACPI_STATUS_DEVICE_ALL_ON);
+	if (CONFIG(EC_GOOGLE_CHROMEEC))
+		acpigen_write_STA(ACPI_STATUS_DEVICE_ALL_ON);
+	else
+		acpigen_write_STA(ACPI_STATUS_DEVICE_HIDDEN_ON);
 	acpigen_write_name("_CRS");
 	acpigen_write_resourcetemplate_header();
 	acpigen_resource_consumer_mmio(base, base + size - 1,

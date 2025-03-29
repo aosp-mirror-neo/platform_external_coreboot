@@ -5,6 +5,7 @@
 #include <acpi/acpi.h>
 #include <amdblocks/apob_cache.h>
 #include <amdblocks/vbios_cache.h>
+#include <amdblocks/vbt.h>
 #include <bootmode.h>
 #include <bootsplash.h>
 #include <console/console.h>
@@ -20,8 +21,13 @@ static void fsp_assign_vbios_upds(FSP_S_CONFIG *scfg)
 		printk(BIOS_SPEW, "%s: using VBIOS cache; skipping GOP driver.\n", __func__);
 		return;
 	}
+	/*
+	 * The VBIOS contains the ATOMBIOS tables that will be modified as
+	 * part of FSP GOP init. We can delay loading of the VBIOS until
+	 * before FSP notify AFTER_PCI_ENUM.
+	 */
 	printk(BIOS_SPEW, "%s: not using VBIOS cache; running GOP driver.\n", __func__);
-	scfg->vbios_buffer = CONFIG(RUN_FSP_GOP) ? PCI_VGA_RAM_IMAGE_START : 0;
+	scfg->vbios_buffer = (uintptr_t)vbt_get();
 }
 
 void platform_fsp_silicon_init_params_cb(FSPS_UPD *supd)

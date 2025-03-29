@@ -137,6 +137,25 @@ int google_chromeec_set_usb_pd_role(uint8_t port, enum usb_pd_control_role role)
 int google_chromeec_get_usb_pd_power_info(enum usb_chg_type *type,
 					  uint16_t *current_max, uint16_t *voltage_max);
 
+/* Check if a USB Power Delivery (PD) charger is attached */
+bool google_chromeec_is_usb_pd_attached(void);
+
+/**
+ * Check if charger is present.
+ *
+ * @return		true: if the charger is present
+ *			false: if the charger is not present
+ */
+bool google_chromeec_is_charger_present(void);
+
+/**
+ * Check if barrel charger is present.
+ *
+ * @return		true: if the barrel charger is present
+ *			false: if the barrel charger is not present
+ */
+bool google_chromeec_is_barrel_charger_present(void);
+
 /*
  * Set max current and voltage of a dedicated charger.
  *
@@ -337,6 +356,18 @@ int google_chromeec_get_cmd_versions(int command, uint32_t *pmask);
  */
 int google_chromeec_get_num_pd_ports(unsigned int *num_ports);
 
+/**
+ * Return a port's PD chip information.
+ *
+ * @param port		The desired port number
+ * @param renew		Refresh cached value
+ * @param r		Result buffer for chip info
+ *
+ * @return 0 if ok, -1 on error
+ */
+int google_chromeec_get_pd_chip_info(int port, int renew,
+				struct ec_response_pd_chip_info *r);
+
 /* Structure representing the capabilities of a USB-PD port */
 struct usb_pd_port_caps {
 	enum ec_pd_power_role_caps power_role_cap;
@@ -423,6 +454,22 @@ void google_chromeec_clear_ec_ap_idle(void);
  *			false: any of the above conditions is not true
  */
 bool google_chromeec_is_battery_present_and_above_critical_threshold(void);
+
+/**
+ * Check if battery level is below critical threshold.
+ *
+ * @return		true: if the battery level is below critical threshold
+ *			false: any the above conditions is not true
+ */
+bool google_chromeec_is_below_critical_threshold(void);
+
+/**
+ * Check if battery is present.
+ *
+ * @return		true: if the battery is present
+ *			false: if the battery is not present
+ */
+bool google_chromeec_is_battery_present(void);
 
 /**
  * Determine if the UCSI stack is currently active.

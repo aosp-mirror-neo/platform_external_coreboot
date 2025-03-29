@@ -33,6 +33,7 @@ pademelon <amd/pademelon/pademelon.md>
 H77 Pro4-M <asrock/h77pro4-m.md>
 H81M-HDS <asrock/h81m-hds.md>
 H110M-DVS <asrock/h110m-dvs.md>
+IMB-1222 <asrock/imb-1222.md>
 ```
 
 ## ASUS
@@ -96,6 +97,14 @@ QEMU x86 PC <emulation/qemu-i440fx.md>
 QEMU POWER9 <emulation/qemu-power9.md>
 ```
 
+## Erying
+
+```{toctree}
+:maxdepth: 1
+
+Polestar G613 Pro <erying/tgl/tgl_matx.md>
+```
+
 ## Facebook
 
 ```{toctree}
@@ -128,8 +137,9 @@ GA-H61M-S2PV <gigabyte/ga-h61m-s2pv.md>
 :maxdepth: 1
 
 Compaq 8200 Elite SFF <hp/compaq_8200_sff.md>
+Compaq 8300 Elite SFF <hp/compaq_8300_sff.md>
 Compaq Elite 8300 USDT <hp/compaq_8300_usdt.md>
-Pro 3500 Series <hp/pro_3500_series.md>
+Pro 3x00 Series <hp/pro_3x00_series.md>
 Z220 Workstation SFF <hp/z220_sff.md>
 ```
 
@@ -174,8 +184,10 @@ mAL-10 <kontron/mal10.md>
 Mainboard codenames <lenovo/codenames.md>
 Hardware Maintenance Manual of ThinkPads <lenovo/thinkpad_hmm.md>
 R60 <lenovo/r60.md>
+ThinkCentre M710s <lenovo/thinkcentre_m710s.md>
 T4xx common <lenovo/t4xx_series.md>
 X2xx common <lenovo/x2xx_series.md>
+M920 Tiny <lenovo/m920q.md>
 vboot <lenovo/vboot.md>
 ```
 
@@ -330,8 +342,15 @@ LabTop Mk III <starlabs/labtop_kbl.md>
 LabTop Mk IV <starlabs/labtop_cml.md>
 StarLite Mk III <starlabs/lite_glk.md>
 StarLite Mk IV <starlabs/lite_glkr.md>
+StarLite Mk V <starlabs/lite_adl.md>
 StarBook Mk V <starlabs/starbook_tgl.md>
 StarBook Mk VI <starlabs/starbook_adl.md>
+StarBook Mk VII (N200) <starlabs/starbook_adl_n.md>
+StarBook Mk VII (165H) <starlabs/starbook_mtl.md>
+Byte Mk II <starlabs/byte_adl.md>
+StarFighter Mk I <starlabs/starfighter_rpl.md>
+
+Building coreboot <starlabs/common/building.md>
 Flashing devices <starlabs/common/flashing.md>
 ```
 
@@ -388,6 +407,13 @@ Serval Workstation 13 <system76/serw13.md>
 :maxdepth: 1
 
 Beaglebone Black <ti/beaglebone-black.md>
+```
+
+## Topton
+```{toctree}
+:maxdepth: 1
+
+X2F-N100 <topton/adl/x2f-n100.md>
 ```
 
 ## UP

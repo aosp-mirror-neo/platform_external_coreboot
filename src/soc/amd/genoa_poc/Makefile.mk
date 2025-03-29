@@ -1,7 +1,6 @@
 ## SPDX-License-Identifier: GPL-2.0-only
 ifeq ($(CONFIG_SOC_AMD_GENOA_POC),y)
 
-all-y		+= mmap_boot.c
 all-y		+= reset.c
 all-y		+= config.c
 all-y		+= gpio.c
@@ -21,6 +20,7 @@ ramstage-y	+= root_complex.c
 ramstage-y	+= smihandler.c
 ramstage-y	+= mca.c
 
+smm-y		+= root_complex.c
 smm-y		+= smihandler.c
 smm-$(CONFIG_DEBUG_SMI) += uart.c
 

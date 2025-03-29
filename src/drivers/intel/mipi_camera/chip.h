@@ -40,8 +40,14 @@ enum camera_device_type {
 };
 
 enum intel_camera_platform_type {
+	PLATFORM_BXT = 8,
 	PLATFORM_SKC = 9,
-	PLATFORM_CNL = 10
+	PLATFORM_CNL = 10,
+	PLATFORM_TGL = 12,
+	PLATFORM_JSL = 14,
+	PLATFORM_ADL = 15,
+	PLATFORM_MTL = 16,
+	PLATFORM_LNL = 17
 };
 
 enum intel_camera_flash_type {
@@ -185,7 +191,6 @@ struct intel_ssdb {
 	uint8_t mipi_define;			/* MIPI info defined in ACPI or
 						sensor driver */
 	uint32_t mclk_speed;			/* Clock info for sensor */
-	uint32_t mclk;				/* Clock info for sensor */
 	uint8_t control_logic_id;		/* PMIC device node used for
 						the camera sensor */
 	uint8_t mipi_data_format;		/* MIPI data format */

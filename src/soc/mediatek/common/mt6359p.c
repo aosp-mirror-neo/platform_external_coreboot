@@ -331,13 +331,13 @@ void mt6359p_enable_vm18(bool enable)
 
 void mt6359p_init_pmif_arb(void)
 {
-	if (!pmif_arb) {
-		pmif_arb = get_pmif_controller(PMIF_SPI, 0);
-		if (!pmif_arb)
-			die("ERROR: No spi device");
-	}
+	if (pmif_arb)
+		return;
 
-	if (pmif_arb->is_pmif_init_done(pmif_arb))
+	pmif_arb = get_pmif_controller(PMIF_SPI, 0);
+	assert(pmif_arb);
+
+	if (pmif_arb->check_init_done(pmif_arb))
 		die("ERROR - Failed to initialize pmif spi");
 }
 
@@ -347,8 +347,8 @@ void mt6359p_init(void)
 	pmic_set_power_hold();
 	pmic_wdt_set();
 	pmic_protect_key_setting(false);
-	pmic_init_setting();
-	pmic_lp_setting();
+	mt6359p_init_setting();
+	mt6359p_lp_setting();
 	pmic_efuse_setting();
 	pmic_protect_key_setting(true);
 	pmic_wk_vs2_voter_setting();

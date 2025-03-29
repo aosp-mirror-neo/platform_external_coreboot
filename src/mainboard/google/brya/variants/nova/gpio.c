@@ -41,11 +41,11 @@ static const struct pad_config override_gpio_table[] = {
 	PAD_CFG_GPO(GPP_C4, 0, DEEP),
 
 	/* D0  : ISH_GP0 ==> BOOT_SEL_N */
-	PAD_NC(GPP_D0, NONE),
+	PAD_CFG_GPO_LOCK(GPP_D0, 1, LOCK_CONFIG),
 	/* D1  : ISH_GP1 ==> REC_MODE */
 	PAD_NC(GPP_D1, NONE),
 	/* D2  : ISH_GP2 ==> DEV_MODE_CTRL */
-	PAD_NC(GPP_D2, NONE),
+	PAD_CFG_GPO_LOCK(GPP_D2, 0, LOCK_CONFIG),
 	/* D3  : ISH_GP3 ==> BOOT_IND */
 	PAD_NC(GPP_D3, NONE),
 	/* D9  : ISH_SPI_CS# ==> NC */
@@ -54,6 +54,8 @@ static const struct pad_config override_gpio_table[] = {
 	PAD_CFG_GPI_LOCK(GPP_D10, NONE, LOCK_CONFIG),
 	/* D13 : ISH_UART0_RXD ==> NC */
 	PAD_NC_LOCK(GPP_D13, NONE, LOCK_CONFIG),
+	/* D14 : ISH_UART0_TXD ==> QSPI_MR_N */
+	PAD_CFG_GPO_LOCK(GPP_D14, 1, LOCK_CONFIG),
 	/* D15 : ISH_UART0_RTS# ==> USI_RST_L */
 	PAD_CFG_GPO(GPP_D15, 1, DEEP),
 	/* D16 : ISH_UART0_CTS# ==> USI_INT */
@@ -89,6 +91,10 @@ static const struct pad_config override_gpio_table[] = {
 	/* F16 : GSXCLK ==> MEM_STRAP_0 */
 	PAD_CFG_GPI_LOCK(GPP_F16, NONE, LOCK_CONFIG),
 
+	/* H4  : I2C0_SDA ==> PCH_I2C_SCALER_SDA */
+	PAD_CFG_NF_LOCK(GPP_H4, NONE, NF1, LOCK_CONFIG),
+	/* H5  : I2C0_SCL ==> PCH_I2C_SCALER_SCL */
+	PAD_CFG_NF_LOCK(GPP_H5, NONE, NF1, LOCK_CONFIG),
 	/* H12 : I2C7_SDA ==> NC */
 	PAD_NC_LOCK(GPP_H12, NONE, LOCK_CONFIG),
 	/* H13 : I2C7_SCL ==> NC */

@@ -9,7 +9,6 @@
 #include <device/pci_type.h>
 #include <device/resource.h> /* IWYU pragma: export */
 #include <smbios.h>
-#include <static.h>
 #include <stdlib.h>
 #include <types.h>
 
@@ -37,6 +36,7 @@ struct chip_operations {
 struct bus;
 
 struct acpi_rsdp;
+struct rom_header;
 
 struct device_operations {
 	void (*read_resources)(struct device *dev);
@@ -128,6 +128,17 @@ struct device {
 	struct device_operations *ops;
 	struct chip_operations *chip_ops;
 	const char *name;
+	/*
+	 * A pointer to the corresponding PCI Option ROM.
+	 *
+	 * When set the Option ROM has been placed in usable DRAM in
+	 * an area that is marked as reserved. This can be for example
+	 * the legacy C-segment or a CBMEM area. The Option ROM is
+	 * read writeable and guaranteed to be used by the device.
+	 * The PCIR data header might still have a different vendor and
+	 * device ID.
+	 */
+	struct rom_header *pci_vga_option_rom;
 #if CONFIG(GENERATE_SMBIOS_TABLES)
 	u8 smbios_slot_type;
 	u8 smbios_slot_data_width;
@@ -150,6 +161,7 @@ struct device {
 
 	/* Zero-terminated array of fields and options to probe. */
 	DEVTREE_CONST struct fw_config *probe_list;
+	bool enable_on_unprovisioned_fw_config;
 };
 
 /**
@@ -183,9 +195,10 @@ const char *dev_name(const struct device *dev);
 const char *dev_path(const struct device *dev);
 u32 dev_path_encode(const struct device *dev);
 const struct device *dev_get_domain(const struct device *dev);
+unsigned int dev_get_domain_id(const struct device *dev);
 void dev_set_enabled(struct device *dev, int enable);
 void disable_children(struct bus *bus);
-bool dev_is_active_bridge(struct device *dev);
+bool dev_is_active_bridge(const struct device *dev);
 bool is_dev_enabled(const struct device *const dev);
 bool is_devfn_enabled(unsigned int devfn);
 bool is_cpu(const struct device *cpu);
@@ -194,6 +207,9 @@ bool is_pci(const struct device *pci);
 bool is_enabled_pci(const struct device *pci);
 bool is_pci_dev_on_bus(const struct device *pci, unsigned int bus);
 bool is_pci_bridge(const struct device *pci);
+bool is_pci_ioapic(const struct device *pci);
+bool is_domain0(const struct device *dev);
+bool is_dev_on_domain0(const struct device *dev);
 
 /* Returns whether there is a hotplug port on the path to the given device. */
 bool dev_path_hotplug(const struct device *);
@@ -483,12 +499,6 @@ static inline DEVTREE_CONST void *config_of(const struct device *dev)
 	devtree_die();
 }
 
-/*
- * Returns pointer to config structure of root device (B:D:F = 0:00:0) defined by
- * sconfig in static.{h/c}.
- */
-#define config_of_soc()		__pci_0_00_0_config
-
 static inline bool is_root_device(const struct device *dev)
 {
 	if (!dev || !dev->upstream)
@@ -503,13 +513,5 @@ void enable_static_devices(struct device *bus);
 void scan_smbus(struct device *bus);
 void scan_generic_bus(struct device *bus);
 void scan_static_bus(struct device *bus);
-
-/* Macro to generate `struct device *` name that points to a device with the given alias. */
-#define DEV_PTR(_alias)		_dev_##_alias##_ptr
-
-/* Macro to generate weak `struct device *` definition that points to a device with the given
-   alias. */
-#define WEAK_DEV_PTR(_alias)			\
-	__weak DEVTREE_CONST struct device *const DEV_PTR(_alias)
 
 #endif /* DEVICE_H */

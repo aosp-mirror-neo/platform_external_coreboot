@@ -69,7 +69,6 @@ static uint32_t numeric_keypad_keymaps[] = {
 	KEYMAP(0xc7, KEY_HOME),
 	KEYMAP(0xcf, KEY_END),
 	/* Row-1 */
-	KEYMAP(0xd3, KEY_DELETE),
 	KEYMAP(0xb5, KEY_KPSLASH),
 	KEYMAP(0x37, KEY_KPASTERISK),
 	KEYMAP(0x4a, KEY_KPMINUS),
@@ -99,6 +98,7 @@ static uint32_t numeric_keypad_keymaps[] = {
 static uint32_t rest_of_keymaps[] = {
 	/* Row-0 */
 	KEYMAP(0x01, KEY_ESC),
+	KEYMAP(0xd3, KEY_DELETE),
 	/* Row-1 */
 	KEYMAP(0x29, KEY_GRAVE),
 	KEYMAP(0x02, KEY_1),
@@ -287,9 +287,10 @@ static void ssdt_generate_keymap(struct acpi_dp *dp, uint8_t num_top_row_keys,
 			keymap = rest_of_keymaps[i];
 			acpi_dp_add_integer(dp_array, NULL, keymap);
 		}
+
+		total += ARRAY_SIZE(rest_of_keymaps);
 	}
 
-	total += ARRAY_SIZE(rest_of_keymaps);
 	printk(BIOS_INFO, "PS2K: Passing %u keymaps to kernel\n", total);
 
 	acpi_dp_add_array(dp, dp_array);

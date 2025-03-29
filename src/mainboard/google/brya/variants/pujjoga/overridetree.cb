@@ -12,7 +12,7 @@ end
 
 chip soc/intel/alderlake
 	# Acoustic settings
-	register "acoustic_noise_mitigation" = "1"
+	register "acoustic_noise_mitigation" = "true"
 	register "slow_slew_rate[VR_DOMAIN_IA]" = "SLEW_FAST_8"
 	register "slow_slew_rate[VR_DOMAIN_GT]" = "SLEW_FAST_8"
 	register "fast_pkg_c_ramp_disable[VR_DOMAIN_IA]" = "1"
@@ -303,7 +303,9 @@ chip soc/intel/alderlake
 				register "int_comp_resistor" = ""lowest""
 				register "input_precharge_resistor_ohms" = "4000"
 				register "input_analog_gain" = "1"
-				device i2c 28 on end
+				device i2c 28 on
+					probe WWAN LTE_PRESENT
+				end
 			end
 		end
 		device ref i2c3 on
