@@ -183,6 +183,8 @@ cc_binary {
     vendor: true,
     srcs: [
         "util/cbmem/cbmem.c",
+        "util/cbmem/common.c",
+        "util/cbmem/devmem_drv.c",
         "src/commonlib/bsd/ipchksum.c",
     ],
 }
