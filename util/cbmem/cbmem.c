@@ -7,27 +7,517 @@
 #include <string.h>
 #include <unistd.h>
 #include <getopt.h>
+#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <ctype.h>
 #include <arpa/inet.h>
+#include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/mman.h>
 #include <libgen.h>
 #include <assert.h>
 #include <regex.h>
 #include <commonlib/bsd/cbmem_id.h>
+#include <commonlib/bsd/ipchksum.h>
 #include <commonlib/bsd/tpm_log_defs.h>
 #include <commonlib/loglevel.h>
 #include <commonlib/timestamp_serialized.h>
 #include <commonlib/tpm_log_serialized.h>
 #include <commonlib/coreboot_tables.h>
 
-#include "cbmem_util.h"
+#ifdef __OpenBSD__
+#include <sys/param.h>
+#include <sys/sysctl.h>
+#endif
 
-#define CBMEM_VERSION "1.2"
+#if defined(__i386__) || defined(__x86_64__)
+#include <x86intrin.h>
+#endif
 
-/* Global verbosity level for debug() macro. */
-int cbmem_util_verbose;
+struct mapping {
+	void *virt;
+	size_t offset;
+	size_t virt_size;
+	unsigned long long phys;
+	size_t size;
+};
+
+#define CBMEM_VERSION "1.1"
+
+/* verbose output? */
+static int verbose = 0;
+#define debug(x...) if(verbose) printf(x)
+
+/* File handle used to access /dev/mem */
+static int mem_fd;
+static struct mapping lbtable_mapping;
+
+static void die(const char *msg)
+{
+	if (msg)
+		fputs(msg, stderr);
+	exit(1);
+}
+
+static unsigned long long system_page_size(void)
+{
+	static unsigned long long page_size;
+
+	if (!page_size)
+		page_size = getpagesize();
+
+	return page_size;
+}
+
+static inline size_t size_to_mib(size_t sz)
+{
+	return sz >> 20;
+}
+
+/* Return mapping of physical address requested. */
+static void *mapping_virt(const struct mapping *mapping)
+{
+	char *v = mapping->virt;
+
+	if (v == NULL)
+		return NULL;
+
+	return v + mapping->offset;
+}
+
+/* Returns virtual address on success, NULL on error. mapping is filled in. */
+static void *map_memory_with_prot(struct mapping *mapping,
+				  unsigned long long phys, size_t sz, int prot)
+{
+	void *v;
+	unsigned long long page_size;
+
+	page_size = system_page_size();
+
+	mapping->virt = NULL;
+	mapping->offset = phys % page_size;
+	mapping->virt_size = sz + mapping->offset;
+	mapping->size = sz;
+	mapping->phys = phys;
+
+	if (size_to_mib(mapping->virt_size) == 0) {
+		debug("Mapping %zuB of physical memory at 0x%llx (requested 0x%llx).\n",
+			mapping->virt_size, phys - mapping->offset, phys);
+	} else {
+		debug("Mapping %zuMB of physical memory at 0x%llx (requested 0x%llx).\n",
+			size_to_mib(mapping->virt_size), phys - mapping->offset,
+			phys);
+	}
+
+	v = mmap(NULL, mapping->virt_size, prot, MAP_SHARED, mem_fd,
+			phys - mapping->offset);
+
+	if (v == MAP_FAILED) {
+		debug("Mapping failed %zuB of physical memory at 0x%llx.\n",
+			mapping->virt_size, phys - mapping->offset);
+		return NULL;
+	}
+
+	mapping->virt = v;
+
+	if (mapping->offset != 0)
+		debug("  ... padding virtual address with 0x%zx bytes.\n",
+			mapping->offset);
+
+	return mapping_virt(mapping);
+}
+
+/* Convenience helper for the common case of read-only mappings. */
+static const void *map_memory(struct mapping *mapping, unsigned long long phys,
+			      size_t sz)
+{
+	return map_memory_with_prot(mapping, phys, sz, PROT_READ);
+}
+
+
+/* Returns 0 on success, < 0 on error. mapping is cleared if successful. */
+static int unmap_memory(struct mapping *mapping)
+{
+	if (mapping->virt == NULL)
+		return -1;
+
+	munmap(mapping->virt, mapping->virt_size);
+	mapping->virt = NULL;
+	mapping->offset = 0;
+	mapping->virt_size = 0;
+
+	return 0;
+}
+
+/* Return size of physical address mapping requested. */
+static size_t mapping_size(const struct mapping *mapping)
+{
+	if (mapping->virt == NULL)
+		return 0;
+
+	return mapping->size;
+}
+
+/*
+ * Some architectures map /dev/mem memory in a way that doesn't support
+ * unaligned accesses. Most normal libc memcpy()s aren't safe to use in this
+ * case, so build our own which makes sure to never do unaligned accesses on
+ * *src (*dest is fine since we never map /dev/mem for writing).
+ */
+static void *aligned_memcpy(void *dest, const void *src, size_t n)
+{
+	uint8_t *d = dest;
+	const volatile uint8_t *s = src;	/* volatile to prevent optimization */
+
+	while ((uintptr_t)s & (sizeof(size_t) - 1)) {
+		if (n-- == 0)
+			return dest;
+		*d++ = *s++;
+	}
+
+	while (n >= sizeof(size_t)) {
+		*(size_t *)d = *(const volatile size_t *)s;
+		d += sizeof(size_t);
+		s += sizeof(size_t);
+		n -= sizeof(size_t);
+	}
+
+	while (n-- > 0)
+		*d++ = *s++;
+
+	return dest;
+}
+
+/* This is a work-around for a nasty problem introduced by initially having
+ * pointer sized entries in the lb_cbmem_ref structures. This caused problems
+ * on 64bit x86 systems because coreboot is 32bit on those systems.
+ * When the problem was found, it was corrected, but there are a lot of
+ * systems out there with a firmware that does not produce the right
+ * lb_cbmem_ref structure. Hence we try to autocorrect this issue here.
+ */
+static struct lb_cbmem_ref parse_cbmem_ref(const struct lb_cbmem_ref *cbmem_ref)
+{
+	struct lb_cbmem_ref ret;
+
+	aligned_memcpy(&ret, cbmem_ref, sizeof(ret));
+
+	if (cbmem_ref->size < sizeof(*cbmem_ref))
+		ret.cbmem_addr = (uint32_t)ret.cbmem_addr;
+
+	debug("      cbmem_addr = %" PRIx64 "\n", ret.cbmem_addr);
+
+	return ret;
+}
+
+static uint32_t cbmem_id_to_lb_tag(uint32_t tag)
+{
+	/* Minimal subset. Expand based on the CBMEM to coreboot table
+	   records mapping in lib/coreboot_table.c */
+	switch (tag) {
+	case CBMEM_ID_TIMESTAMP:
+		return LB_TAG_TIMESTAMPS;
+	case CBMEM_ID_CONSOLE:
+		return LB_TAG_CBMEM_CONSOLE;
+	case CBMEM_ID_TPM_CB_LOG:
+		return LB_TAG_TPM_CB_LOG;
+	}
+	return LB_TAG_UNUSED;
+}
+
+struct cbmem_console {
+	uint32_t size;
+	uint32_t cursor;
+	uint8_t body[];
+} __packed;
+
+#define CBMC_CURSOR_MASK ((1 << 28) - 1)
+#define CBMC_OVERFLOW    (1 << 31)
+
+
+/* Find the first cbmem entry filling in the details. */
+static int find_cbmem_entry(uint32_t id, uint64_t *addr, size_t *size)
+{
+	const uint8_t *table;
+	size_t offset = 0;
+	const uint32_t legacy_tag = cbmem_id_to_lb_tag(id);
+	struct lb_cbmem_ref *ref = NULL;
+
+	table = mapping_virt(&lbtable_mapping);
+
+	if (table == NULL)
+		return -1;
+
+	const struct lb_record *lbr = NULL;
+	while (offset < mapping_size(&lbtable_mapping)) {
+		lbr = (const void *)(table + offset);
+		offset += lbr->size;
+
+		/* Store coreboot table entry for later if CBMEM entry does not exist.
+		   CBMEM entry stores size including the reserved area, so prefer it,
+		   so more potential data and/or space is available. */
+		if (legacy_tag != LB_TAG_UNUSED && lbr->tag == legacy_tag)
+			ref = (struct lb_cbmem_ref *)lbr;
+
+		if (lbr->tag != LB_TAG_CBMEM_ENTRY)
+			continue;
+
+		struct lb_cbmem_entry lbe;
+		aligned_memcpy(&lbe, lbr, sizeof(lbe));
+		if (lbe.id != id)
+			continue;
+
+		*addr = lbe.address;
+		*size = lbe.entry_size;
+		return 0;
+	}
+
+	/* No mapping and/or no potential reference means that
+	   the requested entry does not exit. */
+	if (legacy_tag == LB_TAG_UNUSED || ref == NULL)
+		return -1;
+
+	debug("Found coreboot table record equivalent of CBMEM entry id: %#x, tag: %#x\n", id,
+	      legacy_tag);
+
+	const struct lb_cbmem_ref lbc = parse_cbmem_ref(ref);
+	size_t header_map_size = 0;
+
+	/* Process legacy coreboot table entries */
+	switch (lbc.tag) {
+	case LB_TAG_TIMESTAMPS:
+		header_map_size = sizeof(struct timestamp_table);
+		break;
+	case LB_TAG_CBMEM_CONSOLE:
+		header_map_size = sizeof(struct cbmem_console);
+		break;
+	case LB_TAG_TPM_CB_LOG:
+		header_map_size = sizeof(struct tpm_cb_log_table);
+		break;
+	}
+
+	struct mapping entry_mapping;
+	const void *entry_header = NULL;
+
+	entry_header = map_memory(&entry_mapping, lbc.cbmem_addr, header_map_size);
+	if (!entry_header) {
+		fprintf(stderr, "Unable to map header for coreboot table entry id: %#x\n",
+			legacy_tag);
+		abort();
+	}
+
+	*addr = lbc.cbmem_addr;
+
+	switch (legacy_tag) {
+	case LB_TAG_TIMESTAMPS: {
+		const struct timestamp_table *tst_p = entry_header;
+		*size = sizeof(*tst_p) + tst_p->num_entries * sizeof(tst_p->entries[0]);
+		break;
+	}
+	case LB_TAG_CBMEM_CONSOLE: {
+		const struct cbmem_console *console_p = entry_header;
+		*size = sizeof(*console_p) + console_p->size;
+		break;
+	}
+	case LB_TAG_TPM_CB_LOG: {
+		const struct tpm_cb_log_table *tclt_p = entry_header;
+		*size = sizeof(*tclt_p) + tclt_p->num_entries * sizeof(tclt_p->entries[0]);
+		break;
+	}
+	}
+
+	return 0;
+}
+
+/**
+ * Returns pointer to allocated buffer and size of the buffer in parameters.
+ * Returns zero on success.
+ * free() buffer after use.
+ */
+static int get_cbmem_entry(uint32_t id, uint8_t **buf_out, size_t *size_out)
+{
+	uint64_t addr;
+	size_t size;
+	struct mapping cbmem_mapping;
+
+	if (find_cbmem_entry(id, &addr, &size)) {
+		debug("CBMEM entry not found. CBMEM id: %#x\n", id);
+		return -1;
+	}
+
+	const uint8_t *buf = map_memory(&cbmem_mapping, addr, size);
+	if (!buf) {
+		fprintf(stderr, "Unable to map CBMEM entry id: %#x, size: %zu\n", id, size);
+		abort();
+	}
+
+	*buf_out = malloc(size);
+	if (!*buf_out) {
+		unmap_memory(&cbmem_mapping);
+		fprintf(stderr,
+			"Unable to allocate memory for CBMEM entry id: %#x, size: %zu\n", id,
+			size);
+		abort();
+	}
+
+	aligned_memcpy(*buf_out, buf, size);
+	unmap_memory(&cbmem_mapping);
+	*size_out = size;
+	return 0;
+}
+
+/* Return < 0 on error, 0 on success. */
+static int parse_cbtable(uint64_t address, size_t table_size)
+{
+	const uint8_t *buf;
+	struct mapping header_mapping;
+	size_t req_size;
+	size_t i;
+
+	req_size = table_size;
+	/* Default to 4 KiB search space. */
+	if (req_size == 0)
+		req_size = 4 * 1024;
+
+	debug("Looking for coreboot table at %" PRIx64 " %zd bytes.\n", address, req_size);
+
+	buf = map_memory(&header_mapping, address, req_size);
+
+	if (!buf)
+		return -1;
+
+	/* look at every 16 bytes */
+	for (i = 0; i <= req_size - sizeof(struct lb_header); i += 16) {
+		const struct lb_header *lbh;
+		struct mapping table_mapping;
+
+		lbh = (const struct lb_header *)&buf[i];
+		if (memcmp(lbh->signature, "LBIO", sizeof(lbh->signature)) ||
+		    !lbh->header_bytes ||
+		    ipchksum(lbh, sizeof(*lbh))) {
+			continue;
+		}
+
+		/* Map in the whole table to parse. */
+		if (!map_memory(&table_mapping, address + i + lbh->header_bytes,
+				 lbh->table_bytes)) {
+			debug("Couldn't map in table\n");
+			continue;
+		}
+
+		if (ipchksum(mapping_virt(&table_mapping), lbh->table_bytes) !=
+		    lbh->table_checksum) {
+			debug("Signature found, but wrong checksum.\n");
+			unmap_memory(&table_mapping);
+			continue;
+		}
+
+		debug("Found at %#lx\n", address + i);
+
+		const struct lb_record *lbr_p;
+		const uint8_t *lbtable = mapping_virt(&table_mapping);
+
+		for (size_t offset = 0; offset < lbh->table_bytes; offset += lbr_p->size) {
+			lbr_p = (const struct lb_record *)&lbtable[offset];
+			debug("  coreboot table entry 0x%02x\n", lbr_p->tag);
+
+			if (lbr_p->tag != LB_TAG_FORWARD)
+				continue;
+
+			/* This is a forwarding entry. Repeat the search at the new address. */
+			struct lb_forward lbf_p = *(const struct lb_forward *)lbr_p;
+			debug("    Found forwarding entry.\n");
+
+			const uint64_t next_addr = lbf_p.forward;
+			unmap_memory(&header_mapping);
+			unmap_memory(&table_mapping);
+
+			return parse_cbtable(next_addr, 0);
+		}
+
+		debug("correct coreboot table found.\n");
+		unmap_memory(&header_mapping);
+		lbtable_mapping = table_mapping;
+
+		return 0;
+	}
+
+	unmap_memory(&header_mapping);
+
+	return -1;
+}
+
+static void lb_table_get_entry(uint32_t tag, uint8_t **buf_out, size_t *size_out)
+{
+	const struct lb_record *lbr_p;
+	const uint8_t *lbtable_raw;
+	size_t table_size;
+	bool tag_found = false;
+
+	if (get_cbmem_entry(CBMEM_ID_CBTABLE, (uint8_t **)&lbtable_raw, &table_size)) {
+		fprintf(stderr, "coreboot table not found.\n");
+		abort();
+	}
+
+	const struct lb_header *lbh = (const struct lb_header *)lbtable_raw;
+
+	for (size_t i = 0; i < lbh->table_bytes; i += lbr_p->size) {
+		lbr_p = (const struct lb_record *)(&lbtable_raw[lbh->header_bytes + i]);
+		if (lbr_p->tag == tag) {
+			tag_found = true;
+			break;
+		}
+	}
+
+	if (!tag_found) {
+		fprintf(stderr, "coreboot table entry %#x not found.\n", tag);
+		free((void *)lbtable_raw);
+		abort();
+	}
+
+	debug("coreboot table entry %#x found.\n", tag);
+
+	*buf_out = malloc(lbr_p->size);
+	if (!*buf_out) {
+		fprintf(stderr,
+			"Unable to allocate memory for coreboot table entry %#x, size: %d\n",
+			tag, lbr_p->size);
+		free((void *)lbtable_raw);
+		abort();
+	}
+	memcpy(*buf_out, lbr_p, lbr_p->size);
+	*size_out = lbr_p->size;
+	free((void *)lbtable_raw);
+}
+
+
+/**
+ * Returns mapping, mapped buffer pointer and its size by parameters.
+ * Returns zero on success.
+ * unmap_mempry() after use.
+ */
+static int get_cbmem_entry_rw(uint32_t id, struct mapping *mapping, uint8_t **buf_out,
+			       size_t *size_out)
+{
+	uint64_t addr;
+	size_t size;
+
+	if (find_cbmem_entry(id, &addr, &size)) {
+		debug("CBMEM entry not found. CBMEM id: %#x\n", id);
+		return -1;
+	}
+
+	*buf_out = map_memory_with_prot(mapping, addr, size, PROT_READ | PROT_WRITE);
+	if (!*buf_out) {
+		fprintf(stderr,
+			"Unable to map CBMEM entry id: %#x, size: %zu for read-write access.\n",
+			id, size);
+		abort();
+	}
+
+	*size_out = size;
+	return 0;
+}
 
 #if defined(linux) && (defined(__i386__) || defined(__x86_64__))
 /*
@@ -134,7 +624,7 @@ static uint32_t get_tsc_freq_khz(void)
 	struct lb_tsc_info *tsc_info;
 	size_t size;
 
-	cbmem_get_lb_table_entry(LB_TAG_TSC_INFO, (uint8_t **)&tsc_info, &size);
+	lb_table_get_entry(LB_TAG_TSC_INFO, (uint8_t **)&tsc_info, &size);
 
 	const uint32_t tsc_freq_khz = tsc_info->freq_khz;
 
@@ -300,8 +790,10 @@ static void dump_timestamps(enum timestamps_print_type output_type)
 	uint64_t prev_stamp = 0;
 	uint64_t total_time = 0;
 
-	if (!cbmem_devmem_get_cbmem_entry(CBMEM_ID_TIMESTAMP, (uint8_t **)&tst_p, &size))
-		die("Timestamps not found.\n");
+	if (get_cbmem_entry(CBMEM_ID_TIMESTAMP, (uint8_t **)&tst_p, &size)) {
+		fprintf(stderr, "Timestamps not found.\n");
+		abort();
+	}
 
 	timestamp_set_tick_freq(tst_p->tick_freq_mhz);
 
@@ -398,10 +890,14 @@ static void dump_timestamps(enum timestamps_print_type output_type)
 static void timestamp_add_now(uint32_t timestamp_id)
 {
 	struct timestamp_table *tst_p;
+	struct mapping timestamp_mapping;
 	size_t tst_size;
 
-	if (!cbmem_devmem_get_cbmem_entry(CBMEM_ID_TIMESTAMP, (uint8_t **)&tst_p, &tst_size))
-		die("Unable to find timestamps.\n");
+	if (get_cbmem_entry_rw(CBMEM_ID_TIMESTAMP, &timestamp_mapping, (uint8_t **)&tst_p,
+			       &tst_size)) {
+		fprintf(stderr, "Unable to find timestamps.\n");
+		abort();
+	}
 
 	/*
 	 * Note that coreboot sizes the cbmem entry in the table according to
@@ -417,9 +913,7 @@ static void timestamp_add_now(uint32_t timestamp_id)
 		tst_p->num_entries += 1;
 	}
 
-	if (!cbmem_devmem_write_cbmem_entry(CBMEM_ID_TIMESTAMP, (uint8_t *)tst_p, tst_size))
-		die("Unable to write timestamps.\n");
-	cbmem_devmem_free_entry((uint8_t *)tst_p);
+	unmap_memory(&timestamp_mapping);
 }
 
 static bool can_print(const uint8_t *data, size_t len)
@@ -638,8 +1132,10 @@ static void dump_tpm_cb_log(void)
 	const struct tpm_cb_log_table *tclt_p;
 	size_t tclt_size;
 
-	if (!cbmem_devmem_get_cbmem_entry(CBMEM_ID_TPM_CB_LOG, (uint8_t **)&tclt_p, &tclt_size))
-		die("coreboot TPM log not found.\n");
+	if (get_cbmem_entry(CBMEM_ID_TPM_CB_LOG, (uint8_t **)&tclt_p, &tclt_size)) {
+		fprintf(stderr, "coreboot TPM log not found.\n");
+		abort();
+	}
 
 	printf("coreboot TPM log:\n\n");
 
@@ -651,7 +1147,7 @@ static void dump_tpm_cb_log(void)
 		printf(" %s [%s]\n", tce->digest_type, tce->name);
 	}
 
-	cbmem_devmem_free_entry((uint8_t *)tclt_p);
+	free((void *)tclt_p);
 }
 
 static void dump_tpm_log(void)
@@ -659,10 +1155,10 @@ static void dump_tpm_log(void)
 	uint8_t *buf;
 	size_t size;
 
-	if (cbmem_devmem_get_cbmem_entry(CBMEM_ID_TCPA_TCG_LOG, &buf, &size) ||
-	    cbmem_devmem_get_cbmem_entry(CBMEM_ID_TPM2_TCG_LOG, &buf, &size)) {
+	if (!get_cbmem_entry(CBMEM_ID_TCPA_TCG_LOG, &buf, &size) ||
+	    !get_cbmem_entry(CBMEM_ID_TPM2_TCG_LOG, &buf, &size)) {
 		dump_tpm_std_log(buf);
-		cbmem_devmem_free_entry(buf);
+		free(buf);
 	} else
 		dump_tpm_cb_log();
 }
@@ -704,8 +1200,10 @@ static void dump_console(enum console_print_type type, int max_loglevel, int pri
 	size_t size, cursor, previous;
 	size_t console_buf_size;
 
-	if (!cbmem_devmem_get_cbmem_entry(CBMEM_ID_CONSOLE, (uint8_t **)&console_p, &console_buf_size))
-		die("CBMEM console not found.\n");
+	if (get_cbmem_entry(CBMEM_ID_CONSOLE, (uint8_t **)&console_p, &console_buf_size)) {
+		fprintf(stderr, "CBMEM console not found.\n");
+		abort();
+	}
 
 	cursor = console_p->cursor & CBMC_CURSOR_MASK;
 	if (!(console_p->cursor & CBMC_OVERFLOW) && cursor < console_p->size)
@@ -715,8 +1213,9 @@ static void dump_console(enum console_print_type type, int max_loglevel, int pri
 
 	console_c = malloc(size + 1);
 	if (!console_c) {
-		cbmem_devmem_free_entry((uint8_t *)console_p);
-		die("Not enough memory for console.\n");
+		fprintf(stderr, "Not enough memory for console.\n");
+		free((void *)console_p);
+		abort();
 	}
 	console_c[size] = '\0';
 
@@ -804,22 +1303,73 @@ static void dump_console(enum console_print_type type, int max_loglevel, int pri
 		printf(BIOS_LOG_ESCAPE_RESET);
 
 	free(console_c);
-	cbmem_devmem_free_entry((uint8_t *)console_p);
+	free((void *)console_p);
 }
 
-
-static bool hexdump_handler(const uint32_t id, const uint64_t physical_address, const uint8_t *buf,
-		 const size_t size, void *data)
+/* Hexdump provided buffer using start_address as an offset in the output. */
+static void hexdump(const uintptr_t start_address, const uint8_t *buf, const int length)
 {
-	(void)id;
-	(void)data;
-	hexdump(physical_address, buf, size);
-	return false;
+	int i;
+	int all_zero = 0;
+
+	for (i = 0; i < length; i += 16) {
+		int j;
+
+		all_zero++;
+		for (j = 0; j < 16; j++) {
+			if (buf[i + j] != 0) {
+				all_zero = 0;
+				break;
+			}
+		}
+
+		if (all_zero < 2) {
+			printf("%08lx:", start_address + i);
+			for (j = 0; j < 16; j++)
+				printf(" %02x", buf[i + j]);
+			printf("  ");
+			for (j = 0; j < 16; j++)
+				printf("%c", isprint(buf[i + j]) ? buf[i + j] : '.');
+			printf("\n");
+		} else if (all_zero == 2) {
+			printf("...\n");
+		}
+	}
 }
 
 static void dump_cbmem_hex(void)
 {
-	cbmem_devmem_foreach_cbmem_entry(hexdump_handler, NULL);
+	struct mapping cbmem_mapping;
+	struct lb_memory *memory;
+	const uint8_t *buf = NULL;
+	size_t size = 0;
+
+	lb_table_get_entry(LB_TAG_MEMORY, (uint8_t **)&memory, &size);
+
+	if (!memory)
+		die("No memory entries available.\n");
+
+	const int entries = (memory->size - sizeof(*memory)) / sizeof(memory->map[0]);
+	/* First from the end is CBMEM */
+	for (int i = entries - 1; i >= 0; --i) {
+		if (memory->map[i].type != LB_MEM_TABLE)
+			continue;
+
+		buf = map_memory(&cbmem_mapping, memory->map[i].start, memory->map[i].size);
+		if (!buf)
+			die("Unable to map CBMEM area memory.\n");
+
+		size = memory->map[i].size;
+		break;
+	}
+
+	if (!buf)
+		die("Unable to find CBMEM area memory entry.\n");
+
+	hexdump(cbmem_mapping.phys, buf, size);
+
+	unmap_memory(&cbmem_mapping);
+	free(memory);
 }
 
 static void dump_cbmem_raw(unsigned int id)
@@ -827,35 +1377,84 @@ static void dump_cbmem_raw(unsigned int id)
 	uint8_t *buf;
 	size_t size;
 
-	if (!cbmem_devmem_get_cbmem_entry(id, &buf, &size))
-		die("cbmem entry id: %#x not found.\n", id);
+	if (get_cbmem_entry(id, &buf, &size)) {
+		fprintf(stderr, "cbmem entry id: %#x not found.\n", id);
+		abort();
+	}
 
 	fwrite(buf, 1, size, stdout);
 
-	cbmem_devmem_free_entry(buf);
+	free(buf);
 }
 
-static bool toc_handler(const uint32_t id, const uint64_t physical_address, const uint8_t *buf,
-		 const size_t size, void *data)
+struct cbmem_id_to_name {
+	uint32_t id;
+	const char *name;
+};
+static const struct cbmem_id_to_name cbmem_ids[] = { CBMEM_ID_TO_NAME_TABLE };
+
+#define MAX_STAGEx 10
+static void cbmem_print_entry(int n, uint32_t id, uint64_t base, uint64_t size)
 {
-	(void)buf;
-	int *i = data;
+	const char *name;
+	char stage_x[20];
 
-	cbmem_print_entry(*i, id, physical_address, size);
+	name = NULL;
+	for (size_t i = 0; i < ARRAY_SIZE(cbmem_ids); i++) {
+		if (cbmem_ids[i].id == id) {
+			name = cbmem_ids[i].name;
+			break;
+		}
+		if (id >= CBMEM_ID_STAGEx_META &&
+			id < CBMEM_ID_STAGEx_META + MAX_STAGEx) {
+			snprintf(stage_x, sizeof(stage_x), "STAGE%d META",
+				(id - CBMEM_ID_STAGEx_META));
+			name = stage_x;
+		}
+		if (id >= CBMEM_ID_STAGEx_CACHE &&
+			id < CBMEM_ID_STAGEx_CACHE + MAX_STAGEx) {
+			snprintf(stage_x, sizeof(stage_x), "STAGE%d $  ",
+				(id - CBMEM_ID_STAGEx_CACHE));
+			name = stage_x;
+		}
+	}
 
-	(*i)++;
-
-	return false;
+	printf("%2d. ", n);
+	if (name == NULL)
+		name = "(unknown)";
+	printf("%-20s  %08x", name, id);
+	printf("  %08" PRIx64 " ", base);
+	printf(" %08" PRIx64 "\n", size);
 }
 
 static void dump_cbmem_toc(void)
 {
 	int i = 0;
+	const uint8_t *table = NULL;
+	size_t table_size = 0;
+
+	if (get_cbmem_entry(CBMEM_ID_CBTABLE, (uint8_t **)&table, &table_size)) {
+		fprintf(stderr, "coreboot table not found.\n");
+		abort();
+	}
+
+	const struct lb_header *lbh = (const struct lb_header *)table;
 
 	printf("CBMEM table of contents:\n");
 	printf("    %-20s  %-8s  %-8s  %-8s\n", "NAME", "ID", "START", "LENGTH");
 
-	cbmem_devmem_foreach_cbmem_entry(toc_handler, &i);
+	const struct lb_record *lbr = NULL;
+	for (size_t offset = 0; offset < lbh->table_bytes - sizeof(struct lb_cbmem_entry);
+	     offset += lbr->size) {
+		lbr = (const struct lb_record *)&table[offset];
+
+		if (lbr->tag != LB_TAG_CBMEM_ENTRY)
+			continue;
+
+		const struct lb_cbmem_entry *lbe = (const struct lb_cbmem_entry *)lbr;
+		cbmem_print_entry(i, lbe->id, lbe->address, lbe->entry_size);
+		i++;
+	}
 }
 
 #define COVERAGE_MAGIC 0x584d4153
@@ -893,9 +1492,16 @@ static void dump_coverage(void)
 	unsigned long phys_offset;
 #define phys_to_virt(x) ((void *)(unsigned long)(x) + phys_offset)
 
-	if (!cbmem_devmem_get_cbmem_entry(CBMEM_ID_COVERAGE, &coverage, &size) ||
-	    !cbmem_devmem_probe_cbmem_entry(CBMEM_ID_COVERAGE, &start, &size))
-		die("No coverage information found\n");
+	if (get_cbmem_entry(CBMEM_ID_COVERAGE, &coverage, &size)) {
+		fprintf(stderr, "No coverage information found\n");
+		return;
+	}
+
+	// Physical address is needed for pointer translation
+	if (find_cbmem_entry(CBMEM_ID_COVERAGE, &start, &size)) {
+		fprintf(stderr, "No coverage information found\n");
+		return;
+	}
 
 	/* Map coverage area */
 	phys_offset = (unsigned long)coverage - (unsigned long)start;
@@ -974,6 +1580,121 @@ static void print_usage(const char *name, int exit_code)
 	     "\n");
 	exit(exit_code);
 }
+
+#if defined(__arm__) || defined(__aarch64__)
+static void dt_update_cells(const char *name, int *addr_cells_ptr,
+			    int *size_cells_ptr)
+{
+	if (*addr_cells_ptr >= 0 && *size_cells_ptr >= 0)
+		return;
+
+	int buffer;
+	size_t nlen = strlen(name);
+	char *prop = alloca(nlen + sizeof("/#address-cells"));
+	strcpy(prop, name);
+
+	if (*addr_cells_ptr < 0) {
+		strcpy(prop + nlen, "/#address-cells");
+		int fd = open(prop, O_RDONLY);
+		if (fd < 0 && errno != ENOENT) {
+			perror(prop);
+		} else if (fd >= 0) {
+			if (read(fd, &buffer, sizeof(int)) < 0)
+				perror(prop);
+			else
+				*addr_cells_ptr = ntohl(buffer);
+			close(fd);
+		}
+	}
+
+	if (*size_cells_ptr < 0) {
+		strcpy(prop + nlen, "/#size-cells");
+		int fd = open(prop, O_RDONLY);
+		if (fd < 0 && errno != ENOENT) {
+			perror(prop);
+		} else if (fd >= 0) {
+			if (read(fd, &buffer, sizeof(int)) < 0)
+				perror(prop);
+			else
+				*size_cells_ptr = ntohl(buffer);
+			close(fd);
+		}
+	}
+}
+
+static char *dt_find_compat(const char *parent, const char *compat,
+			    int *addr_cells_ptr, int *size_cells_ptr)
+{
+	char *ret = NULL;
+	struct dirent *entry;
+	DIR *dir;
+
+	if (!(dir = opendir(parent))) {
+		perror(parent);
+		return NULL;
+	}
+
+	/* Loop through all files in the directory (DT node). */
+	while ((entry = readdir(dir))) {
+		/* We only care about compatible props or subnodes. */
+		if (entry->d_name[0] == '.' || !((entry->d_type & DT_DIR) ||
+		    !strcmp(entry->d_name, "compatible")))
+			continue;
+
+		/* Assemble the file name (on the stack, for speed). */
+		size_t plen = strlen(parent);
+		char *name = alloca(plen + strlen(entry->d_name) + 2);
+
+		strcpy(name, parent);
+		name[plen] = '/';
+		strcpy(name + plen + 1, entry->d_name);
+
+		/* If it's a subnode, recurse. */
+		if (entry->d_type & DT_DIR) {
+			ret = dt_find_compat(name, compat, addr_cells_ptr,
+					     size_cells_ptr);
+
+			/* There is only one matching node to find, abort. */
+			if (ret) {
+				/* Gather cells values on the way up. */
+				dt_update_cells(parent, addr_cells_ptr,
+						size_cells_ptr);
+				break;
+			}
+			continue;
+		}
+
+		/* If it's a compatible string, see if it's the right one. */
+		int fd = open(name, O_RDONLY);
+		int clen = strlen(compat);
+		char *buffer = alloca(clen + 1);
+
+		if (fd < 0) {
+			perror(name);
+			continue;
+		}
+
+		if (read(fd, buffer, clen + 1) < 0) {
+			perror(name);
+			close(fd);
+			continue;
+		}
+		close(fd);
+
+		if (!strcmp(compat, buffer)) {
+			/* Initialize these to "unset" for the way up. */
+			*addr_cells_ptr = *size_cells_ptr = -1;
+
+			/* Can't leave string on the stack or we'll lose it! */
+			ret = strdup(parent);
+			break;
+		}
+	}
+
+	closedir(dir);
+	return ret;
+}
+#endif /* defined(__arm__) || defined(__aarch64__) */
 
 int main(int argc, char** argv)
 {
@@ -1072,7 +1793,7 @@ int main(int argc, char** argv)
 				timestamp_id = strtoul(optarg, NULL, 0);
 			break;
 		case 'V':
-			cbmem_util_verbose++;
+			verbose = 1;
 			break;
 		case 'v':
 			print_version();
@@ -1093,8 +1814,77 @@ int main(int argc, char** argv)
 		print_usage(argv[0], 1);
 	}
 
-	if (!cbmem_devmem_init(timestamp_id != 0))
-		die("Unable to initialize /dev/mem access to coreboot tables and CBMEM.\n");
+	mem_fd = open("/dev/mem", timestamp_id ? O_RDWR : O_RDONLY, 0);
+	if (mem_fd < 0) {
+		fprintf(stderr, "Failed to gain memory access: %s\n",
+			strerror(errno));
+		return 1;
+	}
+
+#if defined(__arm__) || defined(__aarch64__)
+	int addr_cells, size_cells;
+	char *coreboot_node = dt_find_compat("/proc/device-tree", "coreboot",
+					     &addr_cells, &size_cells);
+
+	if (!coreboot_node) {
+		fprintf(stderr, "Could not find 'coreboot' compatible node!\n");
+		return 1;
+	}
+
+	if (addr_cells < 0) {
+		fprintf(stderr, "Warning: no #address-cells node in tree!\n");
+		addr_cells = 1;
+	}
+
+	int nlen = strlen(coreboot_node);
+	char *reg = alloca(nlen + sizeof("/reg"));
+
+	strcpy(reg, coreboot_node);
+	strcpy(reg + nlen, "/reg");
+	free(coreboot_node);
+
+	int fd = open(reg, O_RDONLY);
+	if (fd < 0) {
+		perror(reg);
+		return 1;
+	}
+
+	int i;
+	size_t size_to_read = addr_cells * 4 + size_cells * 4;
+	uint8_t *dtbuffer = alloca(size_to_read);
+	if (read(fd, dtbuffer, size_to_read) < 0) {
+		perror(reg);
+		return 1;
+	}
+	close(fd);
+
+	/* No variable-length byte swap function anywhere in C... how sad. */
+	uint64_t baseaddr = 0;
+	for (i = 0; i < addr_cells * 4; i++) {
+		baseaddr <<= 8;
+		baseaddr |= *dtbuffer;
+		dtbuffer++;
+	}
+	uint64_t cb_table_size = 0;
+	for (i = 0; i < size_cells * 4; i++) {
+		cb_table_size <<= 8;
+		cb_table_size |= *dtbuffer;
+		dtbuffer++;
+	}
+
+	parse_cbtable(baseaddr, cb_table_size);
+#else
+	unsigned long long possible_base_addresses[] = { 0, 0xf0000 };
+
+	/* Find and parse coreboot table */
+	for (size_t j = 0; j < ARRAY_SIZE(possible_base_addresses); j++) {
+		if (!parse_cbtable(possible_base_addresses[j], 0))
+			break;
+	}
+#endif
+
+	if (mapping_virt(&lbtable_mapping) == NULL)
+		die("Table not found.\n");
 
 	if (print_console)
 		dump_console(console_type, max_loglevel, print_unknown_logs);
@@ -1123,7 +1913,8 @@ int main(int argc, char** argv)
 	if (print_tcpa_log)
 		dump_tpm_log();
 
-	cbmem_devmem_terminate();
+	unmap_memory(&lbtable_mapping);
 
+	close(mem_fd);
 	return 0;
 }
