@@ -89,7 +89,7 @@ void cbmem_get_lb_table_entry(uint32_t tag, uint8_t **buf_out, size_t *size_out)
 	size_t table_size;
 	bool tag_found = false;
 
-	if (!cbmem_drv_get_cbmem_entry(CBMEM_ID_CBTABLE, (uint8_t **)&lbtable_raw,
+	if (!cbmem_devmem_get_cbmem_entry(CBMEM_ID_CBTABLE, (uint8_t **)&lbtable_raw,
 					  &table_size))
 		die("coreboot table not found.\n");
 
