@@ -67,7 +67,7 @@ chip soc/intel/pantherlake
 	register "usb2_ports[1]" = "USB2_PORT_TYPE_C(OC_SKIP)" # USB2_C1
 	register "usb2_ports[4]" = "USB2_PORT_MID(OC_SKIP)" # Type-A Port A0  # USB HUB (USB2 Camera)
 	register "usb2_ports[5]" = "USB2_PORT_LONG(OC3)" # Type-A Port A1 /
-	register "usb2_ports[7]" = "USB2_PORT_MID(OC_SKIP)" # CNVi BT or discrete BT
+	register "usb2_ports[7]" = "USB2_PORT_MID(OC_SKIP)" # Discrete Bluetooth
 
 	register "usb3_ports[1]" = "USB3_PORT_DEFAULT(OC_SKIP)" # USB3.2 x1 Type-A Con #2 /
 
@@ -102,6 +102,8 @@ chip soc/intel/pantherlake
 	#| I2C4              | CLICK PAD                 |
 	#+-------------------+---------------------------+
 	register "common_soc_config" = "{
+		/* Render OEM footer logo 100px above from the edge */
+		.logo_bottom_margin = 100,
 		.i2c[1] = {
 			.early_init=1,
 			.speed = I2C_SPEED_FAST,
@@ -187,7 +189,10 @@ device ref tbt_pcie_rp0 on end
 						register "desc" = ""USB2 Bluetooth""
 						register "type" = "UPC_TYPE_INTERNAL"
 						register "reset_gpio" = "ACPI_GPIO_OUTPUT_ACTIVE_LOW(GPP_A16)"
-						device ref usb2_port8 on end
+						device ref usb2_port8 on
+							probe WIFI WIFI_PCIE_6
+							probe WIFI WIFI_PCIE_7
+						end
 					end
 					chip drivers/usb/acpi
 						register "desc" = ""USB3 Type-A Port 1""
@@ -250,10 +255,56 @@ device ref tbt_pcie_rp0 on end
 			chip drivers/intel/soundwire
 				device generic 0 on
 					chip drivers/soundwire/alc711
-						# SoundWire Link 3 ID 1
+						register "multilane.lane_mapping" = "{
+							{
+								.lane = 1,
+								.direction = MASTER_LANE,
+								.connection.master_lane = 1
+							},
+							{
+								.lane = 2,
+								.direction = MASTER_LANE,
+								.connection.master_lane = 2
+							},
+						}"
+						register "audio_mode" = "{
+							{
+								.bus_frequency_configs_count = 9,
+								.bus_frequency_configs = {
+									9600 * KHz,
+									4800 * KHz,
+									2400 * KHz,
+									12000 * KHz,
+									6000 * KHz,
+									3000 * KHz,
+									12288 * KHz,
+									6144 * KHz,
+									3072 * KHz,
+								},
+								/* Support 16 KHz to 192 KHz sampling frequency */
+								.sampling_frequency_configs_count = 6,
+								.sampling_frequency_configs = {
+									16 * KHz,
+									32 * KHz,
+									44.1 * KHz,
+									48 * KHz,
+									96 * KHz,
+									192 * KHz
+								},
+							},
+						}"
 						register "desc" = ""Headset Codec""
-						device generic 3.1 on
-						end
+						register "alc711_address.version" = "SOUNDWIRE_VERSION_1_2"
+						register "alc711_address.class" = "MIPI_CLASS_SDCA"
+						register "alc711_address.part_id" = "MIPI_DEV_ID_REALTEK_ALC712"
+						device generic 3.0 on end # SoundWire Link 3 ID 0
+					end
+					chip drivers/soundwire/alc1320
+						register "desc" = ""Speaker Amp""
+						register "alc1320_address.version" = "SOUNDWIRE_VERSION_1_2"
+						register "alc1320_address.class" = "MIPI_CLASS_SDCA"
+						register "alc1320_address.part_id" = "MIPI_DEV_ID_REALTEK_ALC1320"
+						device generic 3.1 on end # SoundWire Link 3 ID 1
 					end
 				end
 			end
@@ -266,9 +317,15 @@ device ref tbt_pcie_rp0 on end
 				register "wake" = "GPE0_PME_B0"
 				register "add_acpi_dma_property" = "true"
 				register "enable_cnvi_ddr_rfim" = "true"
+				use cnvi_bluetooth as bluetooth_companion
 				device generic 0 on end
 			end
 		end # CNVi
+
+		device ref cnvi_bluetooth on
+			probe WIFI WIFI_CNVI_6
+			probe WIFI WIFI_CNVI_7
+		end
 
 		device ref i2c0 on end
 
@@ -298,6 +355,25 @@ device ref tbt_pcie_rp0 on end
 				register "generic.detect" = "1"
 				register "hid_desc_reg_offset" = "0x20"
 				device i2c 0x38 on end
+			end
+			chip drivers/i2c/hid
+				register "generic.hid" = ""SYNA0000""
+				register "generic.cid" = ""ACPI0C50""
+				register "generic.desc" = ""Synaptics Touchpad""
+				register "generic.irq" = "ACPI_IRQ_WAKE_LEVEL_LOW(GPP_E18_IRQ)"
+				register "generic.wake" = "GPE0_DW2_18"
+				register "generic.detect" = "1"
+				register "hid_desc_reg_offset" = "0x20"
+				device i2c 0x2c on end
+			end
+			chip drivers/i2c/hid
+				register "generic.hid" = ""PNP0C50""
+				register "generic.desc" = ""PIXART Touchpad""
+				register "generic.irq" = "ACPI_IRQ_WAKE_LEVEL_LOW(GPP_E18_IRQ)"
+				register "generic.wake" = "GPE0_DW2_18"
+				register "generic.detect" = "1"
+				register "hid_desc_reg_offset" = "0x20"
+				device i2c 0x68 on end
 			end
 		end # I2C4
 

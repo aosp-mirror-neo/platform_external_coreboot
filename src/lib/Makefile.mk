@@ -148,6 +148,7 @@ ramstage-y += hexstrtobin.c
 ramstage-y += wrdd.c
 ramstage-$(CONFIG_CONSOLE_CBMEM) += cbmem_console.c
 ramstage-$(CONFIG_BMP_LOGO) += bmp_logo.c
+ramstage-$(CONFIG_BMP_LOGO) += render_bmp.c
 ramstage-$(CONFIG_BOOTSPLASH) += bootsplash.c
 ramstage-$(CONFIG_BOOTSPLASH) += jpeg.c
 ramstage-$(CONFIG_COLLECT_TIMESTAMPS) += timestamp.c
@@ -290,6 +291,10 @@ postcar-y += prog_ops.c
 postcar-y += rmodule.c
 postcar-$(CONFIG_COLLECT_TIMESTAMPS) += timestamp.c
 postcar-$(CONFIG_GENERIC_UDELAY) += timer.c
+
+all-$(CONFIG_ARCH_ARM) += io.c
+all-$(CONFIG_ARCH_ARM64) += io.c
+all-$(CONFIG_ARCH_RISCV) += io.c
 
 # Use program.ld for all the platforms which use C fo the bootblock.
 bootblock-y += program.ld
@@ -443,3 +448,5 @@ endif
 
 $(eval $(call add_bmp_logo_file_to_cbfs,CONFIG_PLATFORM_HAS_LOW_BATTERY_INDICATOR, \
 	      low_battery.bmp,CONFIG_PLATFORM_LOW_BATTERY_INDICATOR_LOGO_PATH))
+$(eval $(call add_bmp_logo_file_to_cbfs,CONFIG_SPLASH_SCREEN_FOOTER, \
+	      footer_logo.bmp,CONFIG_SPLASH_SCREEN_FOOTER_LOGO_PATH))

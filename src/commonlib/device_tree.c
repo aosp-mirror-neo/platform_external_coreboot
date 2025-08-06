@@ -10,7 +10,6 @@
 #ifdef __COREBOOT__
 #include <console/console.h>
 #else
-#include <stdio.h>
 #define printk(level, ...) printf(__VA_ARGS__)
 #endif
 #include <stdio.h>
@@ -258,6 +257,26 @@ static u32 fdt_read_cell_props(const void *blob, u32 node_offset, u32 *addrcp, u
 		offset += size;
 	}
 	return offset;
+}
+
+uint64_t fdt_read_int_prop(struct fdt_property *prop, u32 cells)
+{
+	if (cells == 0)
+		cells = prop->size / 4;
+
+	if (cells * 4 != prop->size) {
+		printk(BIOS_ERR, "FDT integer property of size %u @%p doesn't match expected cell count %u\n",
+		       prop->size, prop->data, cells);
+		return 0;
+	}
+
+	if (cells == 2)
+		return be64dec(prop->data);
+	else if (cells == 1)
+		return be32dec(prop->data);
+
+	printk(BIOS_ERR, "Illegal FDT integer property size %u @%p\n", prop->size, prop);
+	return 0;
 }
 
 /*
@@ -1040,7 +1059,7 @@ void dt_read_cell_props(const struct device_tree_node *node, u32 *addrcp,
 }
 
 static struct device_tree_node *_dt_find_node(struct device_tree_node *parent,
-					      const char **path, u32 *addrcp,
+					      const char *const *path, u32 *addrcp,
 					      u32 *sizecp, int create)
 {
 	struct device_tree_node *node, *found = NULL;
@@ -1092,7 +1111,7 @@ static struct device_tree_node *_dt_find_node(struct device_tree_node *parent,
  * @return		The found/created node, or NULL.
  */
 struct device_tree_node *dt_find_node(struct device_tree_node *parent,
-				      const char **path, u32 *addrcp,
+				      const char *const *path, u32 *addrcp,
 				      u32 *sizecp, int create)
 {
 	/* Initialize cells to default values according to FDT spec. */

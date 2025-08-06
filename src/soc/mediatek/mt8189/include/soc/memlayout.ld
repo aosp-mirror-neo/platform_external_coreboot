@@ -44,7 +44,7 @@ SECTIONS
 	 * is fixed at SRAM_L2C_START + 4K, and the 4K can be reused after bootblock is started.
 	 * To move the address, gen-bl-img.py also needs to be modified accordingly.
 	 */
-	BOOTBLOCK(0x02001000, 60K)
+	BOOTBLOCK(0x02001000, 70K)
 	#endif
 
 	OVERLAP_DECOMPRESSOR_VERSTAGE_ROMSTAGE(0x0207D000, 272K)
@@ -65,6 +65,7 @@ SECTIONS
 	DRAM_DMA(0x40000000, 1M)
 	POSTRAM_CBFS_CACHE(0x40100000, 2M)
 	RAMSTAGE(0x40300000, 2M)
+	FSP_RAMSTAGE_INIT_CODE(0x40500000, 2M)
 
 	BL31(0x54600000, 0x60000)
 }

@@ -46,7 +46,6 @@ chip soc/intel/cannonlake
 		.tdp_pl2_override = 51,
 		.psys_pmax = 140,
 	}"
-	register "Device4Enable" = "1"
 	register "AcousticNoiseMitigation" = "1"
 	register "SlowSlewRateForIa" = "2"
 	register "SlowSlewRateForGt" = "2"
@@ -193,13 +192,11 @@ chip soc/intel/cannonlake
 	}"
 
 	# PCIe port 9 for Card Reader
-	register "PcieRpEnable[8]" = "true"
 	register "PcieRpLtrEnable[8]" = "true"
 	register "PcieClkSrcUsage[4]" = "8"
 	register "PcieClkSrcClkReq[4]" = "4"
 
 	# PCIe port 13 for M.2 2280 SSD
-	register "PcieRpEnable[12]" = "true"
 	register "PcieRpLtrEnable[12]" = "true"
 	register "PcieClkSrcUsage[2]" = "12"
 	register "PcieClkSrcClkReq[2]" = "2"
@@ -411,11 +408,11 @@ chip soc/intel/cannonlake
 		end
 		device ref pcie_rp9 on
 			smbios_slot_desc "SlotTypeM2Socket1_SD" "SlotLengthOther" "2230" "SlotDataBusWidth1X"
-			register "PcieRpSlotImplemented[8]" = "1"
+			register "PcieRpSlotImplemented[8]" = "true"
 		end
 		device ref pcie_rp13 on
 			smbios_slot_desc "SlotTypeM2Socket3" "SlotLengthOther" "2280" "SlotDataBusWidth4X"
-			register "PcieRpSlotImplemented[12]" = "1"
+			register "PcieRpSlotImplemented[12]" = "true"
 		end
 		device ref uart0 on end
 		device ref lpc_espi on

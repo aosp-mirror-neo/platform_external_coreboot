@@ -3,10 +3,11 @@
 #include <baseboard/gpio.h>
 #include <baseboard/variants.h>
 #include <boardid.h>
+#include <ec/intel/board_id.h>
 #include <soc/gpio.h>
 
 /* Pad configuration in ramstage*/
-static const struct pad_config gpio_table[] = {
+static const struct pad_config t3_gpio_table[] = {
 	/* GPP_A00:     ESPI_IO0_EC_R */
 	/*  GPP_A00 : GPP_A00 ==> ESPI_IO0_EC_R configured on reset, do not touch */
 
@@ -217,8 +218,6 @@ static const struct pad_config gpio_table[] = {
 	/* GPP_E16:     THC0_SPI1_RST_N_TCH_PNL1 */
 	/* THC NOTE: use GPO instead of GPO for THC0 Rst */
 	PAD_CFG_GPO(GPP_E16, 1, DEEP),
-	/* GPP_E17:     THC0_SPI1_CS0_N_TCH_PNL1 */
-	PAD_CFG_NF(GPP_E17, NONE, DEEP, NF3),
 	/* GPP_E18:     THC0_SPI1_INT_N_TCH_PNL1 */
 	PAD_CFG_NF(GPP_E18, NONE, DEEP, NF3),
 	/* GPP_E21:     I2C_PMC_PD_INT_N */
@@ -262,6 +261,9 @@ static const struct pad_config gpio_table[] = {
 	PAD_CFG_NF(GPP_F13, NONE, DEEP, NF8),
 	/* GPP_F17:     Not used */
 	PAD_CFG_GPI_INT(GPP_F17, NONE, PLTRST, EDGE_BOTH),
+	/* GPP_F18:     TCH_PAD_INT_N */
+	/* NOTE: require rework to switch from GPP_A13 to GPP_F18 */
+	PAD_CFG_GPI_APIC(GPP_F18, NONE, PLTRST, LEVEL, INVERT),
 	/* GPP_F19:     GPP_PRIVACY_LED_CAM2 */
 	PAD_CFG_GPO(GPP_F19, 0, PLTRST),
 	/* GPP_F20:     GPP_PRIVACY_LED_CAM1_CVS_HST_WAKE */
@@ -390,10 +392,48 @@ static const struct pad_config romstage_gpio_table[] = {
 	PAD_CFG_NF(GPP_C01, NONE, DEEP, NF1),
 };
 
+/* Pad difference in ramstage for LP5 T4 RVP */
+static const struct pad_config t4_gpio_diff_table[] = {
+	/* GPP_B09:     MOD_TCSS2_DISP_HPD1 */
+	PAD_CFG_NF(GPP_B09, NONE, DEEP, NF2),
+	/* GPP_B10:     MOD_TCSS1_DISP_HPD2 */
+	PAD_CFG_NF(GPP_B10, NONE, DEEP, NF2),
+	/* GPP_B11:     GEN4_SSD_PWREN */
+	PAD_CFG_GPO(GPP_B11, 1, PLTRST),
+
+	/* GPP_B14:     Not used */
+	PAD_NC(GPP_B14, NONE),
+
+	/* GPP_B17:     MOD_TCSS2_LSX_DIR_SEL_EDP_VDD_EN */
+	PAD_CFG_NF(GPP_B17, NONE, DEEP, NF2),
+
+	/* GPP_C06:     X4_PCIE_SLOT_PWR_EN_N */
+	PAD_CFG_GPO(GPP_C06, 0, DEEP),
+	/* GPP_C07:     X4_DT_PCIE_RST_N */
+	PAD_CFG_GPO(GPP_C07, 1, DEEP),
+
+	/* GPP_D01:     MOD_TCSS2_TYP_A_VBUS_EN_EDP_BKLT_EN */
+	PAD_CFG_NF(GPP_D01, NONE, DEEP, NF2),
+	/* GPP_D02:     MOD_TCSS2_EDP_BKLT_CTRL */
+	PAD_CFG_NF(GPP_D02, NONE, DEEP, NF2),
+
+	/* GPP_D20:     CLKREQ7_X4_GEN5_DT_CEM_SLOT_N */
+	PAD_CFG_NF(GPP_D20, NONE, DEEP, NF1),
+
+	/* GPP_E08:     M2_GEN4_SSD_RESET_N */
+	PAD_CFG_GPO(GPP_E08, 1, PLTRST),
+
+	/* GPP_F23:     SMC_LID */
+	PAD_CFG_GPI_TRIG_OWN(GPP_F23, NONE, DEEP, LEVEL, ACPI),
+
+	/* GPP_V17:     TCP_RT_S0IX_ENTRY_EXIT_N */
+	PAD_CFG_GPO(GPP_V17, 1, PLTRST),
+};
+
 const struct pad_config *variant_gpio_table(size_t *num)
 {
-	*num = ARRAY_SIZE(gpio_table);
-	return gpio_table;
+	*num = ARRAY_SIZE(t3_gpio_table);
+	return t3_gpio_table;
 }
 
 const struct pad_config *variant_early_gpio_table(size_t *num)
@@ -409,11 +449,31 @@ const struct pad_config *variant_romstage_gpio_table(size_t *num)
 	return romstage_gpio_table;
 }
 
+const struct pad_config *variant_board_gpio_diff_table(size_t *num)
+{
+	int board_id = get_rvp_board_id();
+
+	switch (board_id) {
+	case PTLP_LP5_T3_RVP:
+		return NULL;
+	case PTLP_LP5_T4_RVP:
+		*num = ARRAY_SIZE(t4_gpio_diff_table);
+		return t4_gpio_diff_table;
+	case GCS_32GB:
+	case GCS_64GB:
+	case PTLP_DDR5_RVP:
+		return NULL;
+	default:
+		die("Unknown board ID = 0x%x\n", board_id);
+	}
+}
+
 static const struct cros_gpio cros_gpios[] = {
 	CROS_GPIO_REC_AL(CROS_GPIO_VIRTUAL, CROS_GPIO_DEVICE0_NAME),
 	CROS_GPIO_REC_AL(CROS_GPIO_VIRTUAL, CROS_GPIO_DEVICE1_NAME),
 	CROS_GPIO_REC_AL(CROS_GPIO_VIRTUAL, CROS_GPIO_DEVICE2_NAME),
 	CROS_GPIO_REC_AL(CROS_GPIO_VIRTUAL, CROS_GPIO_DEVICE3_NAME),
+	CROS_GPIO_WP_AH(GPIO_PCH_WP, CROS_GPIO_DEVICE4_NAME),
 };
 
 DECLARE_CROS_GPIOS(cros_gpios);

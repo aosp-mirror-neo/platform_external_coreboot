@@ -32,6 +32,11 @@ chip soc/intel/skylake
 	register "PmConfigSlpSusMinAssert"	= "3"				# 1s
 	register "PmConfigSlpAMinAssert"	= "3"				# 98ms
 
+	# GPE configuration
+	register "gpe0_dw0"			= "GPP_B"
+	register "gpe0_dw1"			= "GPP_C"
+	register "gpe0_dw2"			= "GPP_E"
+
 	# Enable the correct decode ranges on the LPC bus.
 	register "lpc_ioe"			= "LPC_IOE_EC_4E_4F |
 						   LPC_IOE_KBC_60_64 |
@@ -70,7 +75,6 @@ chip soc/intel/skylake
 				register "generic.hid"		= ""STAR0001""
 				register "generic.desc"		= ""Touchpad""
 				register "generic.irq"		= "ACPI_IRQ_LEVEL_LOW(GPP_C23_IRQ)"
-				register "generic.detect"	= "1"
 				register "hid_desc_reg_offset"	= "0x20"
 				device i2c 2c on end
 			end
@@ -84,7 +88,6 @@ chip soc/intel/skylake
 		end
 		device ref uart2	on  end
 		device ref pcie_rp6	on
-			register "PcieRpEnable[5]"		= "1"
 			register "PcieRpClkReqSupport[5]"	= "1"
 			register "PcieRpClkReqNumber[5]"	= "4"
 			register "PcieRpClkSrcNumber[5]"	= "4"
@@ -96,7 +99,6 @@ chip soc/intel/skylake
 			end
 		end
 		device ref pcie_rp9	on
-			register "PcieRpEnable[8]"		= "1"
 			register "PcieRpClkReqSupport[8]"	= "1"
 			register "PcieRpClkReqNumber[8]"	= "0"
 			register "PcieRpClkSrcNumber[8]"	= "0"

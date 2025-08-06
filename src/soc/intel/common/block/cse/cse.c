@@ -11,6 +11,7 @@
 #include <device/pci_ids.h>
 #include <device/pci_ops.h>
 #include <intelblocks/cse.h>
+#include <intelblocks/fast_spi.h>
 #include <intelblocks/me.h>
 #include <intelblocks/pmclib.h>
 #include <intelblocks/post_codes.h>
@@ -265,6 +266,13 @@ bool cse_is_hfs1_cws_normal(void)
 	if (hfs1.fields.working_state == ME_HFS1_CWS_NORMAL)
 		return true;
 	return false;
+}
+
+bool cse_is_hfs1_cws_m3_no_uma(void)
+{
+	union me_hfsts1 hfs1;
+	hfs1.data = me_read_config32(PCI_ME_HFSTS1);
+	return hfs1.fields.working_state == ME_HFS1_CWS_M3_NO_UMA;
 }
 
 bool cse_is_hfs1_com_normal(void)
@@ -1298,6 +1306,9 @@ static void me_reset_with_count(void)
 
 static void cse_set_state(struct device *dev)
 {
+	if (CONFIG(SOC_INTEL_CSE_LITE_SYNC_BY_PAYLOAD))
+		return;
+
 	/* (CS)ME Disable Command */
 	struct me_disable_command {
 		struct mkhi_hdr hdr;
@@ -1345,6 +1356,13 @@ static void cse_set_state(struct device *dev)
 
 	int send;
 	int result;
+
+	if (fast_spi_flash_descriptor_override()) {
+		printk(BIOS_WARNING, "HECI: not setting ME state because "
+			"flash descriptor override is enabled\n");
+		return;
+	}
+
 	/*
 	 * Check if the CMOS value "me_state" exists, if it doesn't, then
 	 * don't do anything.
@@ -1509,10 +1527,19 @@ struct device_operations cse_ops = {
 };
 
 static const unsigned short pci_device_ids[] = {
+	PCI_DID_INTEL_WCL_CSE0,
 	PCI_DID_INTEL_PTL_H_CSE0,
 	PCI_DID_INTEL_PTL_U_H_CSE0,
 	PCI_DID_INTEL_LNL_CSE0,
 	PCI_DID_INTEL_MTL_CSE0,
+	PCI_DID_INTEL_ARL_CSE0,
+	PCI_DID_INTEL_ARL_S_CSE0,
+	PCI_DID_INTEL_ARL_S_CSE1,
+	PCI_DID_INTEL_ARL_S_CSE2,
+	PCI_DID_INTEL_ARP_S_CSE0,
+	PCI_DID_INTEL_ARP_S_CSE1,
+	PCI_DID_INTEL_ARP_S_CSE2,
+	PCI_DID_INTEL_ARP_S_CSE3,
 	PCI_DID_INTEL_APL_CSE0,
 	PCI_DID_INTEL_GLK_CSE0,
 	PCI_DID_INTEL_CNL_CSE0,

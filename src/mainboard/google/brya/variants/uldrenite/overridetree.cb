@@ -15,6 +15,10 @@ fw_config
 		option MB_C_TWO			0
 		option MB_C_ONE			1
 	end
+	field ISH 8 8
+		option ISH_DISABLE		0
+		option ISH_ENABLE		1
+	end
 end
 
 chip soc/intel/alderlake
@@ -26,7 +30,7 @@ chip soc/intel/alderlake
 	# DPTF enable
 	register "dptf_enable" = "true"
 
-	register "tcc_offset" = "5"     # TCC of 100
+	register "tcc_offset" = "3"
 
 	# Enable CNVi BT
 	register "cnvi_bt_core" = "true"
@@ -87,7 +91,7 @@ chip soc/intel/alderlake
 	register "usb2_ports[5]" = "USB2_PORT_MID(OC_SKIP)"    # User Facing Camera
 	register "usb2_ports[7]" = "USB2_PORT_MID(OC_SKIP)"    # World Facing Camera
 
-	register "usb3_ports[0]" = "USB3_PORT_DEFAULT(OC_SKIP)"	# USB3/2 Type A port A0
+	register "usb3_ports[0]" = "USB3_PORT_DEFAULT(OC1)"	# USB3/2 Type A port A0
 
 	register "tcss_ports[0]" = "TCSS_PORT_DEFAULT(OC_SKIP)"
 	register "tcss_ports[1]" = "TCSS_PORT_DEFAULT(OC_SKIP)"
@@ -190,17 +194,17 @@ chip soc/intel/alderlake
 				## Passive Policy
 				register "policies.passive" = "{
 					[0] = DPTF_PASSIVE(CPU,         CPU,           95, 5000),
-					[1] = DPTF_PASSIVE(CPU,         TEMP_SENSOR_0, 90, 5000),
-					[2] = DPTF_PASSIVE(CPU,         TEMP_SENSOR_1, 90, 5000),
-					[3] = DPTF_PASSIVE(CPU,         TEMP_SENSOR_2, 90, 5000),
+					[1] = DPTF_PASSIVE(CPU,         TEMP_SENSOR_0, 85, 5000),
+					[2] = DPTF_PASSIVE(CPU,         TEMP_SENSOR_1, 85, 5000),
+					[3] = DPTF_PASSIVE(CPU,         TEMP_SENSOR_2, 85, 5000),
 				}"
 
 				## Critical Policy
 				register "policies.critical" = "{
-					[0] = DPTF_CRITICAL(CPU,               105, SHUTDOWN),
-					[1] = DPTF_CRITICAL(TEMP_SENSOR_0,     98, SHUTDOWN),
-					[2] = DPTF_CRITICAL(TEMP_SENSOR_1,     98, SHUTDOWN),
-					[3] = DPTF_CRITICAL(TEMP_SENSOR_2,     98, SHUTDOWN),
+					[0] = DPTF_CRITICAL(CPU,               130, SHUTDOWN),
+					[1] = DPTF_CRITICAL(TEMP_SENSOR_0,     105, SHUTDOWN),
+					[2] = DPTF_CRITICAL(TEMP_SENSOR_1,     105, SHUTDOWN),
+					[3] = DPTF_CRITICAL(TEMP_SENSOR_2,     105, SHUTDOWN),
 				}"
 
 				register "controls.power_limits" = "{
@@ -209,14 +213,14 @@ chip soc/intel/alderlake
 						.max_power = 10000,
 						.time_window_min = 28 * MSECS_PER_SEC,
 						.time_window_max = 28 * MSECS_PER_SEC,
-						.granularity = 500
+						.granularity = 125
 					},
 					.pl2 = {
 						.min_power = 25000,
 						.max_power = 25000,
-						.time_window_min = 32 * MSECS_PER_SEC,
-						.time_window_max = 32 * MSECS_PER_SEC,
-						.granularity = 500
+						.time_window_min = 28 * MSECS_PER_SEC,
+						.time_window_max = 28 * MSECS_PER_SEC,
+						.granularity = 1000
 					}
 				}"
 
@@ -486,7 +490,13 @@ chip soc/intel/alderlake
 			end
 			probe DB_CELLULAR CELLULAR_RW350R
 		end # PCIE2 WWAN card
-		device ref ish off end
+		device ref ish on
+			probe ISH ISH_ENABLE
+			chip drivers/intel/ish
+				register "firmware_name" = ""uldrenite_ish.bin""
+				device generic 0 on end
+			end
+		end
 		device ref shared_sram on end
 		device ref heci1 on end
 		device ref pmc hidden end

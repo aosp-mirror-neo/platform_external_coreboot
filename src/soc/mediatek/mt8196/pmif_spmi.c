@@ -24,16 +24,6 @@ DEFINE_BIT(SAMPL_CK_POL, 0)
 DEFINE_BITFIELD(SAMPL_CK_DLY, 3, 1)
 DEFINE_BITFIELD(SAMPL_CK_DLY_ARB, 6, 4)
 
-/* PMIF, SPI_MODE_CTRL */
-DEFINE_BIT(VLD_SRCLK_EN_CTRL, 5)
-DEFINE_BIT(SPI_MODE_CTRL_PMIF_RDY, 9)
-DEFINE_BIT(SPI_MODE_CTRL_SRCLK_EN, 10)
-DEFINE_BIT(SPI_MODE_CTRL_SRVOL_EN, 11)
-
-/* PMIF, SLEEP_PROTECTION_CTRL */
-DEFINE_BIT(SPM_SLEEP_REQ_SEL, 0)
-DEFINE_BIT(SCP_SLEEP_REQ_SEL, 9)
-
 const struct spmi_device spmi_dev[] = {
 	{
 		.slvid = SPMI_SLAVE_4,	/* MT6363 */
@@ -113,8 +103,6 @@ static const uint32_t lat_limit[2][23] = {
 			    0x0, 0x39, 0x9, 0x0, 0x0, 0x12, 0x3e6, 0x3e6, 0x3e6, 0x0,
 			    0x1e, 0x0, 0x3e6 },
 };
-
-const size_t spmi_dev_cnt = ARRAY_SIZE(spmi_dev);
 
 static struct mtk_spmi_mst_reg *get_mst_reg(struct pmif *arb)
 {
@@ -256,7 +244,7 @@ static int spmi_mst_init(struct pmif *arb)
 	if (pmif_spmi_config_master(arb))
 		return -1;
 
-	for (i = 0; i < spmi_dev_cnt; i++) {
+	for (i = 0; i < spmi_dev_cnt(); i++) {
 		if ((arb->mstid % 2) == spmi_dev[i].mstid) {
 			spmi_cali_rd_clock_polarity(arb, &spmi_dev[i]); /* spmi_cali */
 			spmi_config_slave(arb, &spmi_dev[i]);
@@ -264,21 +252,6 @@ static int spmi_mst_init(struct pmif *arb)
 	}
 
 	return 0;
-}
-
-static void pmif_spmi_force_normal_mode(struct pmif *arb)
-{
-	/* listen srclken_0 only for entering normal or sleep mode */
-	SET32_BITFIELDS(&arb->mtk_pmif->spi_mode_ctrl,
-			VLD_SRCLK_EN_CTRL, 0,
-			SPI_MODE_CTRL_PMIF_RDY, 1,
-			SPI_MODE_CTRL_SRCLK_EN, 0,
-			SPI_MODE_CTRL_SRVOL_EN, 0);
-
-	/* disable spm/scp sleep request */
-	SET32_BITFIELDS(&arb->mtk_pmif->sleep_protection_ctrl, SPM_SLEEP_REQ_SEL, 1,
-			SCP_SLEEP_REQ_SEL, 1);
-	printk(BIOS_INFO, "%s done\n", __func__);
 }
 
 static void pmif_spmi_enable_swinf(struct pmif *arb)
@@ -350,4 +323,9 @@ int pmif_spmi_init(struct pmif *arb)
 	}
 
 	return 0;
+}
+
+size_t spmi_dev_cnt(void)
+{
+	return ARRAY_SIZE(spmi_dev);
 }

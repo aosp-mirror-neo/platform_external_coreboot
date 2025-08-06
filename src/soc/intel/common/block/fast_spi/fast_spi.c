@@ -472,6 +472,15 @@ void fast_spi_clear_outstanding_status(void)
 	write32(spibar + SPIBAR_HSFSTS_CTL, SPIBAR_HSFSTS_W1C_BITS);
 }
 
+/* Check if flash descriptor override is asserted */
+bool fast_spi_flash_descriptor_override(void)
+{
+	void *spibar = fast_spi_get_bar();
+	uint32_t hsfsts = read32(spibar + SPIBAR_HSFSTS_CTL);
+	printk(BIOS_DEBUG, "HSFSTS: 0x%X\n", hsfsts);
+	return !(hsfsts & SPIBAR_HSFSTS_FDOPSS);
+}
+
 
 /* As there is no official ACPI ID for this controller use the generic PNP ID for now. */
 static const char *fast_spi_acpi_hid(const struct device *dev)
@@ -568,6 +577,9 @@ static const unsigned short pci_device_ids[] = {
 	PCI_DID_INTEL_LWB_SPI_SUPER,
 	PCI_DID_INTEL_MCC_SPI0,
 	PCI_DID_INTEL_MTL_HWSEQ_SPI,
+	PCI_DID_INTEL_ARL_HWSEQ_SPI,
+	PCI_DID_INTEL_ARL_S_HWSEQ_SPI,
+	PCI_DID_INTEL_ARP_S_HWSEQ_SPI,
 	PCI_DID_INTEL_RPP_S_HWSEQ_SPI,
 	PCI_DID_INTEL_SPR_HWSEQ_SPI,
 	PCI_DID_INTEL_TGP_SPI0,

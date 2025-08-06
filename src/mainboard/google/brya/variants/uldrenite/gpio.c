@@ -34,8 +34,8 @@ static const struct pad_config gpio_table[] = {
 	PAD_CFG_NF(GPP_A14, NONE, DEEP, NF1),
 	/* A15 : USB_OC2# ==> NC */
 	PAD_NC(GPP_A15, NONE),
-	/* A16 : USB_OC3# ==> NC */
-	PAD_NC_LOCK(GPP_A16, NONE, LOCK_CONFIG),
+	/* A16 : ISH_GP5 */
+	PAD_CFG_NF(GPP_A16, NONE, DEEP, NF4),
 	/* A17 : GPP_A17 ==> GSC_SOC_INT_ODL */
 	PAD_CFG_GPI_APIC(GPP_A17, NONE, PLTRST, LEVEL, INVERT),
 	/* A18 : DDSP_HPDB ==> NC */
@@ -61,10 +61,10 @@ static const struct pad_config gpio_table[] = {
 	PAD_CFG_GPI_IRQ_WAKE(GPP_B3, NONE, PWROK, LEVEL, INVERT),
 	/* B4  : PROC_GP3 ==> EN_PP3300_UCAM_X */
 	PAD_CFG_GPO_LOCK(GPP_B4, 1, LOCK_CONFIG),
-	/* B5  : GPP_B5 ==> NC */
-	PAD_NC(GPP_B5, NONE),
-	/* B6  : GPP_B6 ==> NC */
-	PAD_NC(GPP_B6, NONE),
+	/* B5  : GPP_B5 ==> ISH_I2C0_SCL */
+	PAD_CFG_NF_IOSTANDBY_IGNORE(GPP_B5, NONE, DEEP, NF1),
+	/* B6  : GPP_B6 ==> ISH_I2C0_SDA */
+	PAD_CFG_NF_IOSTANDBY_IGNORE(GPP_B6, NONE, DEEP, NF1),
 	/* B7  : GPP_B7 ==> NC */
 	PAD_NC_LOCK(GPP_B7, NONE, LOCK_CONFIG),
 	/* B8  : GPP_B8 ==> NC */
@@ -119,10 +119,10 @@ static const struct pad_config gpio_table[] = {
 
 	/* D0  : ISH_GP0 ==> UCAM_FW_PROTECT */
 	PAD_CFG_GPO(GPP_D0, 1, DEEP),
-	/* D1  : ISH_GP1 ==> NC */
-	PAD_NC(GPP_D1, NONE),
-	/* D2  : ISH_GP2 ==> TOUCH_SCREEN_DET# */
-	PAD_CFG_GPO_LOCK(GPP_D2, 1, LOCK_CONFIG),
+	/* D1  : ISH_GP1 ==> SOC_GSEN2_INT# */
+	PAD_CFG_NF(GPP_D1, NONE, DEEP, NF1),
+	/* D2  : ISH_GP2 ==> NC */
+	PAD_NC_LOCK(GPP_D2, NONE, LOCK_CONFIG),
 	/* D3  : NC ==> PHY_SHUTTER_DET */
 	PAD_CFG_GPO_LOCK(GPP_D3, 1, LOCK_CONFIG),
 	/* D4  : NC ==> WCAM_FW_PROTECT */
@@ -143,18 +143,18 @@ static const struct pad_config gpio_table[] = {
 	PAD_NC_LOCK(GPP_D11, NONE, LOCK_CONFIG),
 	/* D12 : ISH_SPI_MOSI ==> GPP_D12_STRAP */
 	PAD_NC_LOCK(GPP_D12, NONE, LOCK_CONFIG),
-	/* D13 : UART0_ISH_RXD ==> NC */
-	PAD_NC(GPP_D13, NONE),
-	/* D14 : UART0_ISH_TXD ==> LCD_CBL_DET# */
-	PAD_CFG_GPO(GPP_D14, 1, DEEP),
+	/* D13 : UART0_ISH_RXD */
+	PAD_CFG_NF(GPP_D13, NONE, DEEP, NF1),
+	/* D14 : UART0_ISH_TXD */
+	PAD_CFG_NF(GPP_D14, NONE, DEEP, NF1),
 	/* D15  : GPP_D15 ==> SOC_TS_I2C_RST# */
 	PAD_CFG_GPO_LOCK(GPP_D15, 1, LOCK_CONFIG),
 	/* D16 : ISH_UART0_CTS# ==> SOC_TS_I2C_INT# */
 	PAD_CFG_GPI_APIC(GPP_D16, NONE, PLTRST, LEVEL, INVERT),
-	/* D17 : NC ==> UART1_ISH_RX_DBG_TX */
-	PAD_CFG_NF(GPP_D17, NONE, DEEP, NF2),
-	/* D18 : NC ==> UART1_ISH_TX_DBG_RX */
-	PAD_CFG_NF(GPP_D18, NONE, DEEP, NF2),
+	/* D17 : NC */
+	PAD_NC(GPP_D17, NONE),
+	/* D18 : LCD_CBL_DET# ==> NC */
+	PAD_NC(GPP_D18, NONE),
 	/* D19 : I2S_MCLK1_OUT ==> NC */
 	PAD_NC(GPP_D19, NONE),
 
@@ -176,8 +176,8 @@ static const struct pad_config gpio_table[] = {
 	PAD_NC(GPP_E7, NONE),
 	/* E8  : GPP_E8 ==> WLAN_DISABLE_L */
 	PAD_CFG_GPO(GPP_E8, 1, DEEP),
-	/* E9  : NC */
-	PAD_NC_LOCK(GPP_E9, NONE, LOCK_CONFIG),
+	/* E9  : GPP_E9 ==> SOC_ACC2_INT# */
+	PAD_CFG_NF(GPP_E9, NONE, DEEP, NF2),
 	/* E10 : NC */
 	PAD_NC_LOCK(GPP_E10, NONE, LOCK_CONFIG),
 	/* E11 : NC */

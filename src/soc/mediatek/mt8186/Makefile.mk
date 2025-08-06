@@ -5,10 +5,10 @@ ifeq ($(CONFIG_SOC_MEDIATEK_MT8186),y)
 all-y += ../common/cpu_id.c
 all-y += ../common/flash_controller.c
 all-y += ../common/gpio_eint_v1.c ../common/gpio.c ../common/gpio_op.c  gpio.c
-all-y += ../common/i2c.c i2c.c
+all-y += ../common/i2c.c ../common/i2c_common.c i2c.c
 all-y += ../common/pll.c pll.c
 all-$(CONFIG_SPI_FLASH) += ../common/spi.c spi.c
-all-y += ../common/timer.c ../common/timer_prepare.c
+all-y += ../common/timer.c ../common/timer_prepare_v1.c
 all-y += ../common/uart.c
 
 bootblock-y += bootblock.c
@@ -30,7 +30,7 @@ romstage-y += ../common/mmu_operations.c ../common/mmu_cmops.c
 romstage-y += ../common/mt6315.c mt6315.c
 romstage-y += ../common/pmic_wrap.c pmic_wrap.c pmif.c mt6366.c
 romstage-y += ../common/pmif.c ../common/pmif_clk.c ../common/pmif_init.c pmif_clk.c
-romstage-y += ../common/pmif_spmi.c pmif_spmi.c
+romstage-y += ../common/pmif_spmi.c ../common/pmif_spmi_v1.c pmif_spmi.c
 romstage-y += ../common/rtc.c ../common/rtc_pwrap_ops.c ../common/rtc_osc_init.c rtc.c
 
 ramstage-y += adsp.c
@@ -81,6 +81,6 @@ $(DRAM_CBFS)-compression := $(CBFS_PRERAM_COMPRESS_FLAG)
 cbfs-files-y += $(DRAM_CBFS)
 
 $(objcbfs)/bootblock.bin: $(objcbfs)/bootblock.raw.bin
-	./util/mtkheader/gen-bl-img.py mt8183 sf $< $@
+	./util/mediatek/gen-bl-img.py mt8183 sf $< $@
 
 endif

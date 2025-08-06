@@ -36,6 +36,7 @@ static void pch_log_rp_wake_source(void)
 		{ PCI_DEVFN_PCIE4,	ELOG_WAKE_SOURCE_PME_PCIE4 },
 		{ PCI_DEVFN_PCIE5,	ELOG_WAKE_SOURCE_PME_PCIE5 },
 		{ PCI_DEVFN_PCIE6,	ELOG_WAKE_SOURCE_PME_PCIE6 },
+#if CONFIG(SOC_INTEL_PANTHERLAKE)
 		{ PCI_DEVFN_PCIE7,	ELOG_WAKE_SOURCE_PME_PCIE7 },
 		{ PCI_DEVFN_PCIE8,	ELOG_WAKE_SOURCE_PME_PCIE8 },
 		{ PCI_DEVFN_PCIE9,	ELOG_WAKE_SOURCE_PME_PCIE9 },
@@ -43,6 +44,7 @@ static void pch_log_rp_wake_source(void)
 #if CONFIG(SOC_INTEL_PANTHERLAKE_U_H)
 		{ PCI_DEVFN_PCIE11,	ELOG_WAKE_SOURCE_PME_PCIE11 },
 		{ PCI_DEVFN_PCIE12,	ELOG_WAKE_SOURCE_PME_PCIE12 },
+#endif
 #endif
 	};
 
@@ -62,7 +64,9 @@ static void pch_log_pme_internal_wake_source(void)
 		{ PCI_DEVFN_XHCI,	ELOG_WAKE_SOURCE_PME_XHCI },
 		{ PCI_DEVFN_USBOTG,	ELOG_WAKE_SOURCE_PME_XDCI },
 		{ PCI_DEVFN_CNVI_WIFI,	ELOG_WAKE_SOURCE_PME_WIFI },
+#if CONFIG(SOC_INTEL_PANTHERLAKE)
 		{ PCI_DEVFN_TCSS_XDCI,	ELOG_WAKE_SOURCE_PME_TCSS_XDCI },
+#endif
 	};
 	const struct xhci_wake_info xhci_wake_info[] = {
 		{ PCI_DEVFN_XHCI,	ELOG_WAKE_SOURCE_PME_XHCI },
@@ -206,7 +210,11 @@ static void pch_log_state(void *unused)
 		pch_log_wake_source(ps);
 }
 
+#if CONFIG(POSTPONE_SPI_ACCESS)
+BOOT_STATE_INIT_ENTRY(BS_PAYLOAD_LOAD, BS_ON_ENTRY, pch_log_state, NULL);
+#else
 BOOT_STATE_INIT_ENTRY(BS_DEV_INIT, BS_ON_EXIT, pch_log_state, NULL);
+#endif
 
 void elog_gsmi_cb_platform_log_wake_source(void)
 {

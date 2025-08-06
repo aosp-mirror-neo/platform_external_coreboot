@@ -88,6 +88,16 @@ chip soc/intel/meteorlake
 		[PchSerialIoIndexI2C5] = PchSerialIoPci,
 	}"
 
+	# Acoustic Noise settings and slew rate configuration:
+	#  slew rate for IA Domain: Fast/8
+	#  slew rate for GT Domain: Fast/8
+	#  Ignore slew rate configuration for SA Domain
+	register "enable_acoustic_noise_mitigation" = "1"
+	register "disable_fast_pkgc_ramp[VR_DOMAIN_IA]" = "1"
+	register "slow_slew_rate_config[VR_DOMAIN_IA]" = "SLEW_FAST_8"
+	register "disable_fast_pkgc_ramp[VR_DOMAIN_GT]" = "1"
+	register "slow_slew_rate_config[VR_DOMAIN_GT]" = "SLEW_FAST_8"
+
 	# Intel Common SoC Config
 	#+-------------------+---------------------------+
 	#| Field             |  Value                    |
@@ -130,7 +140,12 @@ chip soc/intel/meteorlake
 			.speed = I2C_SPEED_FAST,
 			.rise_time_ns = 900,
 			.fall_time_ns = 400,
-			.data_hold_time_ns = 50,
+			.speed_config[0] = {
+				.speed = I2C_SPEED_FAST,
+				.scl_lcnt = 163,
+				.scl_hcnt = 85,
+				.sda_hold = 40,
+			}
 		},
 	}"
 
@@ -444,6 +459,7 @@ chip soc/intel/meteorlake
 				register "generic.stop_gpio" = "ACPI_GPIO_OUTPUT_ACTIVE_LOW(GPP_C06)"
 				register "generic.stop_off_delay_ms" = "1"
 				register "generic.has_power_resource" = "1"
+				register "generic.use_gpio_for_status" = "true"
 				register "hid_desc_reg_offset" = "0x01"
 				device i2c 0x10 on end
 			end

@@ -53,6 +53,7 @@ P8H77-V <asus/p8h77-v.md>
 P8Z77-M <asus/p8z77-m.md>
 P8Z77-M Pro <asus/p8z77-m_pro.md>
 P8Z77-V <asus/p8z77-v.md>
+P8Z77-V LE PLUS <asus/p8z77-v_le_plus.md>
 wifigo_v1 <asus/wifigo_v1.md>
 ```
 
@@ -139,6 +140,7 @@ GA-H61M-S2PV <gigabyte/ga-h61m-s2pv.md>
 Compaq 8200 Elite SFF <hp/compaq_8200_sff.md>
 Compaq 8300 Elite SFF <hp/compaq_8300_sff.md>
 Compaq Elite 8300 USDT <hp/compaq_8300_usdt.md>
+Compaq Pro 6300 Series Microtower/SFF <hp/compaq_pro_6300_series.md>
 Pro 3x00 Series <hp/pro_3x00_series.md>
 Z220 Workstation SFF <hp/z220_sff.md>
 ```
@@ -185,6 +187,7 @@ Mainboard codenames <lenovo/codenames.md>
 Hardware Maintenance Manual of ThinkPads <lenovo/thinkpad_hmm.md>
 R60 <lenovo/r60.md>
 ThinkCentre M710s <lenovo/thinkcentre_m710s.md>
+ThinkCentre M700 / M900 Tiny <lenovo/thinkcentre_m900_tiny.md>
 T4xx common <lenovo/t4xx_series.md>
 X2xx common <lenovo/x2xx_series.md>
 M920 Tiny <lenovo/m920q.md>
@@ -239,6 +242,13 @@ Internal flashing <lenovo/ivb_internal_flashing.md>
 T440p <lenovo/t440p.md>
 ```
 
+### Skylake/Kabylake series
+
+```{toctree}
+:maxdepth: 1
+
+T480/T480s <lenovo/t480.md>
+```
 ## Libretrend
 
 ```{toctree}

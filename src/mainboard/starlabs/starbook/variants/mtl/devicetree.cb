@@ -18,7 +18,12 @@ chip soc/intel/meteorlake
 		[PchSerialIoIndexUART0]			= PchSerialIoSkipInit,
 	}"
 
-	# Device Tree
+	# Power
+	register "pch_slp_s3_min_assertion_width"	= "SLP_S3_ASSERTION_1_MS"
+	register "pch_slp_s4_min_assertion_width"	= "SLP_S4_ASSERTION_3S"
+	register "pch_slp_sus_min_assertion_width"	= "SLP_SUS_ASSERTION_1_S"
+	register "pch_slp_a_min_assertion_width"	= "SLP_A_ASSERTION_98_MS"
+
 	device domain 0 on
 		device ref igpu		on
 			chip drivers/gfx/generic
@@ -74,11 +79,11 @@ chip soc/intel/meteorlake
 		device ref gna		on  end
 		device ref xhci		on
 			# Motherboard USB 3.0 Type-C Back	7893 mil
-			register "usb2_ports[0]"		= "USB2_PORT_MID(OC_SKIP)"
+			register "usb2_ports[0]"		= "USB2_PORT_TYPE_C(OC_SKIP)"
 			register "tcss_ports[0]"		= "TCSS_PORT_DEFAULT(OC_SKIP)"
 
 			# Motherboard USB 3.0 Type-C Front	9557 mil
-			register "usb2_ports[2]"		= "USB2_PORT_MID(OC_SKIP)"
+			register "usb2_ports[2]"		= "USB2_PORT_TYPE_C(OC_SKIP)"
 			register "tcss_ports[1]"		= "TCSS_PORT_DEFAULT(OC_SKIP)"
 
 			# Motherboard USB 3.0 Type-A		8916 mil
@@ -101,62 +106,62 @@ chip soc/intel/meteorlake
 			chip drivers/usb/acpi
 				device ref xhci_root_hub on
 					chip drivers/usb/acpi
-						register "desc"		= ""Back USB Type-C""
-						register "type"		= "UPC_TYPE_C_USB2_SS_SWITCH"
-						register "use_custom_pld" = "true"
-						register "custom_pld"	= "ACPI_PLD_TYPE_C(LEFT, CENTER, ACPI_PLD_GROUP(0, 0))"
+						register "desc"			= ""Back USB Type-C""
+						register "type"			= "UPC_TYPE_C_USB2_SS_SWITCH"
+						register "use_custom_pld"	= "true"
+						register "custom_pld"		= "ACPI_PLD_TYPE_C(LEFT, CENTER, ACPI_PLD_GROUP(0, 0))"
 						device ref usb2_port1 on end
 					end
 					chip drivers/usb/acpi
-						register "desc"		= ""Front USB Type-C""
-						register "type"		= "UPC_TYPE_C_USB2_SS_SWITCH"
+						register "desc"			= ""Front USB Type-C""
+						register "type"			= "UPC_TYPE_C_USB2_SS_SWITCH"
 						register "use_custom_pld"	= "true"
-						register "custom_pld"	= "ACPI_PLD_TYPE_C(LEFT, CENTER, ACPI_PLD_GROUP(0, 1))"
+						register "custom_pld"		= "ACPI_PLD_TYPE_C(LEFT, CENTER, ACPI_PLD_GROUP(0, 1))"
 						device ref usb2_port3 on end
 					end
 					chip drivers/usb/acpi
-						register "desc"		= ""Left USB Type-A""
-						register "type"		= "UPC_TYPE_USB3_A"
-						register "group"	= "ACPI_PLD_GROUP(0, 2)"
+						register "desc"			= ""Left USB Type-A""
+						register "type"			= "UPC_TYPE_USB3_A"
+						register "group"		= "ACPI_PLD_GROUP(0, 2)"
 						device ref usb2_port2 on end
 					end
 					chip drivers/usb/acpi
-						register "desc"		= ""Left USB Type-A""
-						register "type"		= "UPC_TYPE_USB3_A"
-						register "group"	= "ACPI_PLD_GROUP(0, 2)"
+						register "desc"			= ""Left USB Type-A""
+						register "type"			= "UPC_TYPE_USB3_A"
+						register "group"		= "ACPI_PLD_GROUP(0, 2)"
 						device ref usb3_port1 on end
 					end
 					chip drivers/usb/acpi
-						register "desc"		= ""Right Rear USB Type-A""
-						register "type"		= "UPC_TYPE_USB3_A"
-						register "group"	= "ACPI_PLD_GROUP(0, 3)"
+						register "desc"			= ""Right Rear USB Type-A""
+						register "type"			= "UPC_TYPE_USB3_A"
+						register "group"		= "ACPI_PLD_GROUP(0, 3)"
 						device ref usb2_port7 on end
 					end
 					chip drivers/usb/acpi
-						register "desc"		= ""Right Rear USB Type-A""
-						register "type"		= "UPC_TYPE_USB3_A"
-						register "group"	= "ACPI_PLD_GROUP(0, 3)"
+						register "desc"			= ""Right Rear USB Type-A""
+						register "type"			= "UPC_TYPE_USB3_A"
+						register "group"		= "ACPI_PLD_GROUP(0, 3)"
 						device ref usb3_port2 on end
 					end
 					chip drivers/usb/acpi
-						register "desc"		= ""Internal Webcam""
-						register "type"		= "UPC_TYPE_INTERNAL"
-						register "group"	= "ACPI_PLD_GROUP(0, 4)"
+						register "desc"			= ""Internal Webcam""
+						register "type"			= "UPC_TYPE_INTERNAL"
+						register "group"		= "ACPI_PLD_GROUP(0, 4)"
 						device ref usb2_port5 on end
 					end
 					chip drivers/usb/acpi
-						register "desc"		= ""USB 2.0 Hub""
-						register "type"		= "UPC_TYPE_HUB"
-						register "group"	= "ACPI_PLD_GROUP(0, 5)"
+						register "desc"			= ""USB 2.0 Hub""
+						register "type"			= "UPC_TYPE_HUB"
+						register "group"		= "ACPI_PLD_GROUP(0, 5)"
 						device ref usb2_port8 on end
 					end
 					chip drivers/usb/acpi
-						register "desc"		= ""Internal Bluetooth""
-						register "type"		= "UPC_TYPE_INTERNAL"
-						register "is_intel_bluetooth" = "true"
-						register "enable_gpio"	= "ACPI_GPIO_OUTPUT_ACTIVE_HIGH(GPP_B18)"
-						register "reset_gpio"	= "ACPI_GPIO_OUTPUT_ACTIVE_LOW(GPP_B18)"
-						register "group"	= "ACPI_PLD_GROUP(0, 6)"
+						register "desc"			= ""Internal Bluetooth""
+						register "type"			= "UPC_TYPE_INTERNAL"
+						register "is_intel_bluetooth"	= "true"
+						register "enable_gpio"		= "ACPI_GPIO_OUTPUT_ACTIVE_HIGH(GPP_B18)"
+						register "reset_gpio"		= "ACPI_GPIO_OUTPUT_ACTIVE_LOW(GPP_B18)"
+						register "group"		= "ACPI_PLD_GROUP(0, 6)"
 						device ref usb2_port10 on end
 					end
 				end
@@ -171,6 +176,7 @@ chip soc/intel/meteorlake
 				device i2c 2c on end
 			end
 		end
+		device ref vpu on end
 		device ref ioe_shared_sram	on  end
 		device ref pmc_shared_sram	on  end
 		device ref pcie_rp9	on				# WiFi
@@ -181,6 +187,7 @@ chip soc/intel/meteorlake
 				.pcie_rp_aspm				= ASPM_L0S_L1,
 				.PcieRpL1Substates			= L1_SS_L1_2,
 			}"
+
 			smbios_slot_desc				"SlotTypePciExpressGen3X1"
 									"SlotLengthShort"
 									"M.2/M 2230"
@@ -204,8 +211,8 @@ chip soc/intel/meteorlake
 				.flags					= PCIE_RP_LTR | PCIE_RP_AER,
 				.pcie_rp_aspm				= ASPM_L0S_L1,
 				.PcieRpL1Substates			= L1_SS_L1_2,
-
 			}"
+
 			smbios_slot_desc				"SlotTypeM2Socket3"
 									"SlotLengthLong"
 									"M.2/M 2280"
@@ -213,7 +220,7 @@ chip soc/intel/meteorlake
 
 			chip soc/intel/common/block/pcie/rtd3
 				register "enable_gpio"			= "ACPI_GPIO_OUTPUT_ACTIVE_HIGH(GPP_H07)"
-				register "reset_gpio"			= "ACPI_GPIO_OUTPUT_ACTIVE_LOW(GPP_H00)"
+				register "reset_gpio"			= "ACPI_GPIO_OUTPUT_ACTIVE_LOW(GPP_A20)"
 				register "srcclk_pin"			= "8"
 				register "is_storage"			= "true"
 				register "add_acpi_dma_property"	= "true"

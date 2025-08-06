@@ -36,22 +36,21 @@
 #define   EC7_CAM1_EN		BIT(0)
 
 #define EC_GPIO_8_ADDR		0xA8
-#define EC8_ODD_PWR_EN     BIT(0)
-#define EC8_HDD_PWR_EN     BIT(1)
-#define EC8_M2SSD_PWREN    BIT(5)
-#define EC8_WL_RADIO       BIT(6)
-#define EC8_BT_RADIO       BIT(7)
+#define     EC8_ODD_PWR_EN	BIT(0)
+#define     EC8_HDD_PWR_EN	BIT(1)
+#define     EC8_M2SSD_PWREN	BIT(5)
+#define     EC8_WL_RADIO	BIT(6)
+#define     EC8_BT_RADIO	BIT(7)
 
 #define EC_GPIO_9_ADDR		0xA9
-#define SMBUS1_DEV_MUX_SW   BIT(0)       // ECRAMxA9[0]
-#define SMBUS0_DEV_MUX_SW   BIT(1)       // ECRAMxA9[1]
-#define MUX0_S0             BIT(2)       // ECRAMxA9[2]
-#define MUX0_S1             BIT(3)       // ECRAMxA9[3]
-#define MUX1_S0             BIT(4)       // ECRAMxA9[4]
-#define MUX1_S1             BIT(5)       // ECRAMxA9[5]
-#define MUX2_S0             BIT(6)       // ECRAMxA9[6]
-#define MUX2_S1             BIT(7)       // ECRAMxA9[7]
-
+#define    EC9_MUX2_S1             BIT(7)
+#define    EC9_MUX2_S0             BIT(6)
+#define    EC9_MUX1_S1             BIT(5)
+#define    EC9_MUX1_S0             BIT(4)
+#define    EC9_MUX0_S1             BIT(3)
+#define    EC9_MUX0_S0             BIT(2)
+#define    EC9_SMBUS0_DEV_MUX_SW   BIT(1)
+#define    EC9_SMBUS1_DEV_MUX_SW   BIT(0)
 
 #define EC_GPIO_A_ADDR		0xAA
 #define   ECA_MUX2_S0		BIT(7)
@@ -62,6 +61,10 @@
 #define   ECA_MUX0_S1		BIT(2)
 #define   ECA_SMBUS1_EN		BIT(1)
 #define   ECA_SMBUS0_EN		BIT(0)
+
+#define EC_GPIO_B_ADDR		0xAB
+#define   ECB_TPNL_EN		BIT(2)
+#define   ECB_TPNL_PWR_EN	BIT(0)
 
 #define EC_GPIO_C_ADDR		0xAC
 #define   ECC_TPNL_BUF_EN	BIT(6)
@@ -124,23 +127,37 @@ static void configure_ec_gpio(void)
 
 	tmp = ec_read(EC_GPIO_7_ADDR);
 	printk(BIOS_SPEW, "A7: Write reg [0x%02x] = 0x%02x\n", EC_GPIO_7_ADDR, tmp);
-	if (ENABLE_M2_SSD1) {
-		tmp |= (EC7_ODD_SSD_SW|EC7_SSD_HDD_SW);
+	if (CONFIG(ENABLE_M2_SSD1)) {
+		tmp |= (EC7_ODD_SSD_SW | EC7_SSD_HDD_SW);
 	} else {
-		tmp &= ~(EC7_ODD_SSD_SW|EC7_SSD_HDD_SW);
+		tmp &= ~(EC7_ODD_SSD_SW | EC7_SSD_HDD_SW);
 	}
 	printk(BIOS_SPEW, "Write reg [0x%02x] = 0x%02x\n", EC_GPIO_7_ADDR, tmp);
 	ec_write(EC_GPIO_7_ADDR, tmp);
 
 	tmp = ec_read(EC_GPIO_8_ADDR);
 	printk(BIOS_SPEW, "A8: Write reg [0x%02x] = 0x%02x\n", EC_GPIO_8_ADDR, tmp);
-	if (ENABLE_M2_SSD1) {
+	if (CONFIG(ENABLE_M2_SSD1)) {
 		tmp |= EC8_M2SSD_PWREN;
 	} else {
 		tmp &= ~EC8_M2SSD_PWREN;
 	}
 	printk(BIOS_SPEW, "Write reg [0x%02x] = 0x%02x\n", EC_GPIO_8_ADDR, tmp);
 	ec_write(EC_GPIO_8_ADDR, tmp);
+
+	/* eDP Touch panel  */
+	if(CONFIG(ENABLE_EDP)) {
+		tmp = ec_read(EC_GPIO_9_ADDR);
+		tmp &= ~(EC9_MUX0_S1);
+		tmp |= EC9_MUX0_S0;
+		printk(BIOS_SPEW, "Write reg [0x%02x] = 0x%02x\n", EC_GPIO_9_ADDR, tmp);
+		ec_write(EC_GPIO_9_ADDR, tmp);
+
+		tmp  = ec_read(EC_GPIO_B_ADDR);
+		tmp |= ECB_TPNL_EN | ECB_TPNL_EN;
+		printk(BIOS_SPEW, "Write reg [0x%02x] = 0x%02x\n", EC_GPIO_B_ADDR, tmp);
+		ec_write(EC_GPIO_B_ADDR, tmp);
+	}
 }
 
 static const struct soc_amd_gpio RevA_gpio_set_stage_ram[] = {

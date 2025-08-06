@@ -306,9 +306,6 @@ define asl_template
 $(CONFIG_CBFS_PREFIX)/$(1).aml-file = $(obj)/$(1).aml
 $(CONFIG_CBFS_PREFIX)/$(1).aml-type = raw
 $(CONFIG_CBFS_PREFIX)/$(1).aml-compression = none
-ifeq ($(CONFIG_SOC_AMD_COMMON_BLOCK_LPC_SPI_DMA),y)
-$(CONFIG_CBFS_PREFIX)/$(1).aml-align = 64
-endif
 cbfs-files-$(if $(2),$(2),y) += $(CONFIG_CBFS_PREFIX)/$(1).aml
 $(eval DEPENDENCIES += $(obj)/$(1).d)
 $(obj)/$(1).aml: $(src)/mainboard/$(MAINBOARDDIR)/$(1).asl $(obj)/config.h
@@ -535,8 +532,8 @@ CFLAGS_common += -Wstring-compare
 ifeq ($(CONFIG_COMPILER_GCC),y)
 CFLAGS_common += -Wold-style-declaration
 CFLAGS_common += -Wcast-function-type
-# Don't add these GCC specific flags when running scan-build
-ifeq ($(CCC_ANALYZER_OUTPUT_FORMAT),)
+# Don't add these GCC specific flags when running clang-tidy
+ifeq ($(CLANG_TIDY),)
 CFLAGS_common += -Wno-packed-not-aligned
 CFLAGS_common += -fconserve-stack
 CFLAGS_common += -Wnull-dereference
@@ -1096,10 +1093,8 @@ endif # ifeq($(CONFIG_HAVE_IFD_BIN),y)
 endif # ifneq($(CONFIG_IFD_CHIPSET),)
 
 # entire flash
-FMAP_ROM_ADDR := $(call int-subtract, 0x100000000 $(CONFIG_ROM_SIZE))
 FMAP_ROM_SIZE := $(CONFIG_ROM_SIZE)
 # entire "BIOS" region (everything directly of concern to the host system)
-# relative to ROM_BASE
 FMAP_BIOS_BASE := $(call int-align, $(call int-subtract, $(CONFIG_ROM_SIZE) $(CONFIG_CBFS_SIZE)), 0x10000)
 FMAP_BIOS_SIZE := $(call int-align-down, $(shell echo $(CONFIG_CBFS_SIZE) | tr A-F a-f), 0x10000)
 # position and size of flashmap, relative to BIOS_BASE
@@ -1185,10 +1180,8 @@ else # ifeq ($(CONFIG_ARCH_X86),y)
 
 DEFAULT_FLASHMAP:=$(top)/util/cbfstool/default.fmd
 # entire flash
-FMAP_ROM_ADDR := 0
 FMAP_ROM_SIZE := $(CONFIG_ROM_SIZE)
 # entire "BIOS" region (everything directly of concern to the host system)
-# relative to ROM_BASE
 FMAP_BIOS_BASE := 0
 FMAP_BIOS_SIZE := $(CONFIG_CBFS_SIZE)
 # position and size of flashmap, relative to BIOS_BASE
@@ -1233,8 +1226,7 @@ FMAP_CBFS_SIZE := $(call int-subtract,$(FMAP_BIOS_SIZE) $(FMAP_CBFS_BASE))
 endif # ifeq ($(CONFIG_ARCH_X86),y)
 
 $(obj)/fmap.fmd: $(top)/Makefile.mk $(DEFAULT_FLASHMAP) $(obj)/config.h
-	sed -e "s,##ROM_BASE##,$(FMAP_ROM_ADDR)," \
-	    -e "s,##ROM_SIZE##,$(FMAP_ROM_SIZE)," \
+	sed -e "s,##ROM_SIZE##,$(FMAP_ROM_SIZE)," \
 	    -e "s,##BIOS_BASE##,$(FMAP_BIOS_BASE)," \
 	    -e "s,##BIOS_SIZE##,$(FMAP_BIOS_SIZE)," \
 	    -e "s,##FMAP_BASE##,$(FMAP_FMAP_BASE)," \

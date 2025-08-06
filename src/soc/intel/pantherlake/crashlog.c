@@ -17,7 +17,9 @@
 #define CRASHLOG_NODES_COUNT		0x1
 #define CRASHLOG_PUNIT_STORAGE_OFF_MASK	BIT(24)
 #define CRASHLOG_RE_ARM_STATUS_MASK	BIT(25)
-#define CRASHLOG_CONSUMED_MASK		BIT(31)
+#define CRASHLOG_CONSUMED_BIOS_MASK	BIT(27)
+#define CRASHLOG_SET_CLEAR_TRIGGER_MASK	BIT(30)
+#define CRASHLOG_SET_CONSUMED_MASK	BIT(18)
 
 /* Global crashLog info */
 static bool m_pmc_crash_log_support;
@@ -327,7 +329,7 @@ static bool cpu_cl_gen_discovery_table(void)
 			continue;
 
 		u32 dw0 = read32p(disc_tab_addr + cur_offset);
-		if (dw0 & CRASHLOG_CONSUMED_MASK) {
+		if (dw0 & CRASHLOG_CONSUMED_BIOS_MASK) {
 			printk(BIOS_DEBUG, "cpu crashlog records already consumed."
 						"id: 0x%x dw0: 0x%x\n", i, dw0);
 			break;
@@ -392,6 +394,10 @@ static uintptr_t get_control_status_interface(void)
 
 int cpu_cl_clear_data(void)
 {
+	/* Clear all crashlog data and CRASHLOG_SET_CONSUMED = 1 -> sets CONSUMED_BIOS bit */
+	setbits64p(cl_get_cpu_bar_addr() + CRASHLOG_WATCHER_CONTROL_OFFSET,
+			CRASHLOG_SET_CLEAR_TRIGGER_MASK | CRASHLOG_SET_CONSUMED_MASK);
+
 	return 0;
 }
 

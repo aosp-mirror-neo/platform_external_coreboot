@@ -35,7 +35,6 @@ chip soc/intel/cannonlake
 		.tdp_pl2_override = 51,
 		.psys_pmax = 140,
 	}"
-	register "Device4Enable" = "1"
 	register "AcousticNoiseMitigation" = "1"
 	register "SlowSlewRateForIa" = "2"
 	register "SlowSlewRateForGt" = "2"
@@ -182,18 +181,15 @@ chip soc/intel/cannonlake
 	}"
 
 	# PCIe port 10 for M.2 2230 WLAN
-	register "PcieRpEnable[9]" = "true"
 	register "PcieClkSrcUsage[2]" = "9"
 	register "PcieClkSrcClkReq[2]" = "2"
 
 	# PCIe port 11 for card reader
-	register "PcieRpEnable[10]" = "true"
 	register "PcieRpLtrEnable[10]" = "true"
 	register "PcieClkSrcUsage[1]" = "10"
 	register "PcieClkSrcClkReq[1]" = "1"
 
 	# PCIe port 13 for M.2 2280 SSD
-	register "PcieRpEnable[12]" = "true"
 	register "PcieRpLtrEnable[12]" = "true"
 	register "PcieClkSrcUsage[4]" = "12"
 	register "PcieClkSrcClkReq[4]" = "4"
@@ -342,19 +338,19 @@ chip soc/intel/cannonlake
 		device ref uart2 on  end
 		device ref pcie_rp10 on
 			smbios_slot_desc "SlotTypeM2Socket1_SD" "SlotLengthOther" "2230" "SlotDataBusWidth1X"
-			register "PcieRpSlotImplemented[9]" = "1"
+			register "PcieRpSlotImplemented[9]" = "true"
 		end
 		device ref pcie_rp11 on
-			register "PcieRpSlotImplemented[10]" = "1"
+			register "PcieRpSlotImplemented[10]" = "true"
 		end
 		device ref pcie_rp13 on
 			# x4 lanes
 			chip drivers/generic/bayhub
-				register "power_saving" = "1"
+				register "power_saving" = "true"
 				device pci 00.0 on end
 			end
 			smbios_slot_desc "SlotTypeM2Socket3" "SlotLengthOther" "2280" "SlotDataBusWidth4X"
-			register "PcieRpSlotImplemented[12]" = "1"
+			register "PcieRpSlotImplemented[12]" = "true"
 		end
 		device ref lpc_espi on
 			chip ec/google/wilco

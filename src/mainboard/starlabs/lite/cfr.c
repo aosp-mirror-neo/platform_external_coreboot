@@ -1,49 +1,17 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 
 #include <boot/coreboot_tables.h>
-#include <commonlib/coreboot_tables.h>
+#include <console/cfr.h>
 #include <drivers/option/cfr_frontend.h>
 #include <ec/starlabs/merlin/cfr.h>
-#include <inttypes.h>
-#include <intelblocks/pcie_rp.h>
-#include <string.h>
-#include <types.h>
+#include <intelblocks/cfr.h>
 #include <variants.h>
-
-static const struct sm_object boot_option = SM_DECLARE_ENUM({
-	.opt_name	= "boot_option",
-	.ui_name	= "Boot Option",
-	.ui_helptext	= "Change the boot device in the event of a failed boot",
-	.default_value	= 0,
-	.values		= (const struct sm_enum_value[]) {
-				{ "Fallback",		0		},
-				{ "Normal",		1		},
-				SM_ENUM_VALUE_END			},
-});
 
 static const struct sm_object card_reader = SM_DECLARE_BOOL({
 	.opt_name	= "card_reader",
 	.ui_name	= "Card Reader",
 	.ui_helptext	= "Enable or disable the built-in card reader",
 	.default_value	= true,
-});
-
-static const struct sm_object debug_level = SM_DECLARE_ENUM({
-	.opt_name	= "debug_level",
-	.ui_name	= "Debug Level",
-	.ui_helptext	= "Set the verbosity of the debug output.",
-	.default_value	= 0,
-	.values		= (const struct sm_enum_value[]) {
-				{ "Emergency",		0		},
-				{ "Alert",		1		},
-				{ "Critical",		2		},
-				{ "Error",		3		},
-				{ "Warning",		4		},
-				{ "Notice",		5		},
-				{ "Info",		6		},
-				{ "Debug",		7		},
-				{ "Spew",		8		},
-				SM_ENUM_VALUE_END			},
 });
 
 #if CONFIG(EC_STARLABS_FAST_CHARGE)
@@ -54,13 +22,6 @@ static const struct sm_object fast_charge = SM_DECLARE_BOOL({
 	.default_value	= false,
 });
 #endif
-
-static const struct sm_object power_on_after_fail = SM_DECLARE_BOOL({
-	.opt_name	= "power_on_after_fail",
-	.ui_name	= "Power on after failure",
-	.ui_helptext	= "Automatically turn on after a power failure",
-	.default_value	= false,
-});
 
 static const struct sm_object power_profile = SM_DECLARE_ENUM({
 	.opt_name	= "power_profile",
@@ -79,13 +40,6 @@ static const struct sm_object microphone = SM_DECLARE_BOOL({
 	.ui_name	= "Microphone",
 	.ui_helptext	= "Enable or disable the built-in microphone",
 	.default_value	= true,
-});
-
-static const struct sm_object reboot_counter = SM_DECLARE_NUMBER({
-	.opt_name	= "reboot_counter",
-	.ui_name	= "Reboot Counter",
-	.flags		= CFR_OPTFLAG_SUPPRESS,
-	.default_value	= 0,
 });
 
 static const struct sm_object webcam = SM_DECLARE_BOOL({
@@ -109,6 +63,16 @@ static const struct sm_object vtd = SM_DECLARE_BOOL({
 	.default_value	= true,
 });
 
+static const struct sm_object s0ix_enable = SM_DECLARE_BOOL({
+	.opt_name	= "s0ix_enable",
+	.ui_name	= "Modern Standby (S0ix)",
+	.ui_helptext	= "Enabled: Use S0ix for device sleep.\n"
+			  "Disabled: Use ACPI S3 for device sleep.\n"
+			  "Requires Intel ME to be enabled.\n"
+			  "Recommended: Enabled when booting Windows, disabled otherwise.",
+	.default_value	= false,
+});
+
 static struct sm_obj_form performance = {
 	.ui_name = "Performance",
 	.obj_list = (const struct sm_object *[]) {
@@ -120,6 +84,7 @@ static struct sm_obj_form performance = {
 static struct sm_obj_form processor = {
 	.ui_name = "Processor",
 	.obj_list = (const struct sm_object *[]) {
+		&s0ix_enable,
 		&vtd,
 		NULL
 	},
@@ -131,7 +96,7 @@ static struct sm_obj_form power = {
 		#if CONFIG(EC_STARLABS_FAST_CHARGE)
 		&fast_charge,
 		#endif
-		&power_on_after_fail,
+		&power_on_after_fail_bool,
 		NULL
 	},
 };
@@ -171,9 +136,7 @@ static struct sm_obj_form pci = {
 static struct sm_obj_form coreboot = {
 	.ui_name = "coreboot",
 	.obj_list = (const struct sm_object *[]) {
-		&boot_option,
 		&debug_level,
-		&reboot_counter,
 		NULL
 	},
 };

@@ -7,6 +7,7 @@
 - BirmanPlus for Phoenix SoC
 - BirmanPlus for Glinda SoC
 - Chausie
+- Crater for Renoir SoC
 - Majolica
 - Mayan for Phoenix SoC
 
@@ -36,7 +37,10 @@
 - Panther (ASUS Chromebox CN60)
 - Tricky (Dell Chromebox 3010)
 - Zako (HP Chromebox G1)
+- Bluey
+- Quenbi
 - Brox
+- Brox RTK EC
 - Brox EC ISH
 - Brox TI PDC
 - Greenbayupoc
@@ -54,6 +58,7 @@
 - Craaskov
 - Constitution
 - Crota
+- Dirks
 - Dochi
 - Domika
 - Felwinter
@@ -63,6 +68,7 @@
 - Gladios
 - Glassway
 - Gothrax
+- Guren
 - Hades
 - Kano
 - Kinox
@@ -72,6 +78,7 @@
 - Marasov
 - Mithrax
 - Moli
+- Moxie
 - Nivviks
 - Nereid
 - Nokris
@@ -80,7 +87,9 @@
 - Pirrha
 - Primus
 - Pujjo
+- Pujjoniru
 - Quandiso
+- Quandiso2
 - Redrix
 - Redrix4ES
 - Riven
@@ -109,8 +118,12 @@
 - Sundance
 - Pujjoga
 - Pujjogatwin
+- Pujjolo
 - Orisa
 - Telith
+- Meliks
+- Epic
+- Pujjocento
 - Butterfly (HP Pavilion Chromebook 14)
 - Cherry
 - Dojo
@@ -129,6 +142,7 @@
 - Veluza
 - Starmie
 - Wugtrio
+- Wyrdeer
 - Banon (Acer Chromebook 15 (CB3-532))
 - Celes (Samsung Chromebook 3)
 - Cyan (Acer Chromebook R11 (C738T))
@@ -148,6 +162,7 @@
 - Fatcatnuvo
 - Felino
 - Francka
+- Kinmen
 - Fizz
 - Karma
 - Endeavour
@@ -230,6 +245,7 @@
 - Oak
 - Elm (Acer Chromebook R13)
 - Hana (Lenovo N23 Yoga Chromebook)
+- Ocelot
 - Parrot (Acer C7/C710 Chromebook)
 - Atlas (Google Pixelbook Go)
 - Poppy
@@ -238,18 +254,18 @@
 - Nocturne (Google Pixel Slate)
 - Rammus
 - Soraka (HP Chromebook x2)
-- Ambassador
-- Dooly
+- Ambassador (Meet Compute System [Intel 10th Gen])
+- Dooly (HP Chromebase 21.5)
 - Duffy Legacy (32MB)
 - Duffy (ASUS Chromebox 4)
 - Faffy (ASUS Fanless Chromebox)
-- Genesis
+- Genesis (Meet Compute System - Series One [Intel 10th Gen])
 - Kaisa Legacy (32MB)
 - Kaisa (Acer Chromebox CXI4)
-- Moonbuggy
+- Moonbuggy (Series One Board 65)
 - Noibat (HP Chromebox G3)
 - Puff
-- Scout
+- Scout (Series One Desk 27)
 - Wyvern (CTL Chromebox CBx2)
 - Hylia
 - Navi
@@ -280,7 +296,10 @@
 - Markarth (Acer Chromebook Plus 514)
 - Skyrim
 - Winterhold (Dell Latitude 3445 Chromebook)
+- Anakin
+- Obiwan
 - Skywalker
+- Yoda
 - Falco (HP Chromebook 14)
 - Leon (Toshiba Chromebook)
 - Peppy (Acer C720/C720P Chromebook)
@@ -373,6 +392,8 @@
 - Meteorlake-P RVP with Chrome EC for Prod Silicon
 - Meteorlake-P RVP with Chrome EC for non-Prod Silicon
 - Meteorlake-P RVP with Microchip EC
+- Ptlrvp
+- Google Chrome EC
 - shadowmountain
 - Strago
 - Tigerlake UP3 RVP
@@ -417,6 +438,12 @@
 - PRO Z790-P (WIFI) DDR4
 - PRO Z790-P (WIFI)
 
+## NovaCustom
+- V540TNx (14\", discrete graphics)
+- V560TNx (16\", discrete graphics)
+- V540TU (14\", integrated graphics)
+- V560TU (16\", integrated graphics)
+
 ## OpenCellular
 - Elgon (GBCv2)
 
@@ -440,6 +467,7 @@
 
 ## Star Labs
 - Star Labs Byte Mk II (N200)
+- Star Labs Byte Mk III (N355)
 - Star Labs Lite Mk III (N5000)
 - Star Labs Lite Mk IV (N5030)
 - Star Labs LabTop Mk III (i7-8550u)
@@ -447,8 +475,11 @@
 - Star Labs StarBook Mk V (i3-1115G4 and i7-1165G7)
 - Star Labs StarBook Mk VI (i3-1220P and i7-1260P)
 - Star Labs StarBook Mk VI (i3-1315U and i7-1360P)
+- Star Labs StarBook Mk VII (N200)
+- Star Labs StarBook Mk VII (165H)
 - Star Labs StarFighter Mk I (i3-1315U, i7-13700H and i9-13900H)
 - Star Labs Lite Mk V (N200)
+- Star Labs Lite Mk V Smart Battery (N200)
 
 ## Supermicro
 - X11SSH-TF
