@@ -57,6 +57,7 @@ enum mkhi_group_id {
 #define MKHI_BUP_COMMON_GET_BOOT_PERF_DATA	0x8
 
 /* ME Current Working States */
+#define ME_HFS1_CWS_M3_NO_UMA	0x4
 #define ME_HFS1_CWS_NORMAL	0x5
 
 /* ME Current Operation Modes */
@@ -181,10 +182,17 @@ struct cse_fw_partition_info {
 	struct cse_fw_ish_version_info ish_partition_info;
 };
 
+/* CSE sync flags */
+enum cse_sync_flags {
+	CSE_DOWNGRADE_REQUEST		= 1 << 0,
+	CSE_ENFORCED_SYNC_REQUEST	= 1 << 1,
+	CSE_ENFORCED_SYNC_PERFORMED	= 1 << 2,
+};
+
 /* CSE Specific Information */
 struct cse_specific_info {
 	struct cse_fw_partition_info cse_fwp_version;
-	bool cse_downgrade_requested;
+	int8_t cse_sync_status;
 	uint32_t crc;
 };
 
@@ -452,6 +460,12 @@ void print_me_fw_version(void *unused);
  * Returns true if CSE's current working state is normal, otherwise false.
  */
 bool cse_is_hfs1_cws_normal(void);
+
+/*
+ * Checks current working operation state is M3_NO_UMA or not.
+ * Returns true if CSE's current working state is M3_NO_UMA, otherwise false.
+ */
+bool cse_is_hfs1_cws_m3_no_uma(void);
 
 /*
  * Checks CSE's current operation mode is normal or not.

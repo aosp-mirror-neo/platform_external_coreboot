@@ -23,8 +23,6 @@ extern int cbmem_util_verbose;
 		abort();            \
 	} while (0)
 
-void hexdump(const uintptr_t start_address, const uint8_t *buf, const int length);
-
 struct cbmem_console {
 	uint32_t size;
 	uint32_t cursor;
@@ -34,15 +32,13 @@ struct cbmem_console {
 #define CBMC_CURSOR_MASK ((1 << 28) - 1)
 #define CBMC_OVERFLOW    (1 << 31)
 
-void cbmem_print_entry(int n, uint32_t id, uint64_t base, uint64_t size);
-
 /**
  * Function pointer type used by CBMEM foreach iteration calls.
  *
  * @param id CBMEM_ID_* value.
  * @param physical_address CBMEM entry address in physical memory.
- * @param buf heap-allocated bufer with CBMEM entry contents.
- * @param size size of CBMEM entry in bytes.
+ * @param buf heap-allocated buffer with CBMEM entry contents.
+ * @param size is the size of CBMEM entry in bytes.
  * @param data callback-specific context data.
  *
  * @returns true if iteration should finish, false if it should continue.
@@ -50,29 +46,18 @@ void cbmem_print_entry(int n, uint32_t id, uint64_t base, uint64_t size);
 typedef bool (*cbmem_iterator_callback)(const uint32_t id, const uint64_t physical_address,
 					const uint8_t *buf, const size_t size, void *data);
 
-/**
- * Get a coreboot table entry as an allocated buffer.
- *
- * @param tag LB_TAG_* value.
- * @param buf_out return pointer for the allocated buffer containing entry contents.
- * @param size_out size of returned buffer.
- *
- * Aborts (via abort()) on failure.
- */
-void cbmem_get_lb_table_entry(uint32_t tag, uint8_t **buf_out, size_t *size_out);
-
 /* Common CBMEM access API */
 
 enum cbmem_drv_backend_type {
-	CBMEM_DRV_BACKEND_ANY = 0,
-	CBMEM_DRV_BACKEND_DEVMEM = 1,
-	CBMEM_DRV_BACKEND_SYSFS = 2,
+	CBMEM_DRV_BACKEND_ANY,
+	CBMEM_DRV_BACKEND_DEVMEM,
+	CBMEM_DRV_BACKEND_SYSFS,
 };
 
 /**
  * Pick and initialize CBMEM driver. Function can either probe for available drivers or initialize only the selected one.
  *
- * @param backend prefered CBMEM backend to initialize.
+ * @param backend preferred CBMEM backend to initialize.
  * @param writeable initialize CBMEM driver in writeable mode. Required by devmem driver to modify CBMEM.
  *
  * @returns true on success, false otherwise.
@@ -86,31 +71,16 @@ bool cbmem_drv_init(enum cbmem_drv_backend_type backend, bool writeable);
 void cbmem_drv_terminate(void);
 
 /**
- * Check if CBMEM entry exists. If it does, then return address and size.
- *
- * @param id CBMEM_ID_* value.
- * @param addr_out pointer to the output buffer for entry address in physical memory.
- * @param size_out pointer to the output buffer for entry size.
- *
- * @returns true if entry exists, false otherwise.
- */
-bool cbmem_drv_probe_cbmem_entry(uint32_t id, uint64_t *addr_out, size_t *size_out);
-
-/**
  * Get CBMEM entry as an allocated buffer.
  *
  * @param id CBMEM_ID_* value.
  * @param buf_out return pointer for the allocated buffer containing entry contents.
  * @param size_out size of returned buffer.
+ * @param addr_out pointer to the output buffer for entry address in physical memory. Optional.
  *
  * @returns true on success, false otherwise.
  */
-bool cbmem_drv_get_cbmem_entry(uint32_t id, uint8_t **buf_out, size_t *size_out);
-
-/**
- * Free buffer allocated by cbmem_devmem_get_cbmem_entry().
- */
-void cbmem_drv_free_entry(uint8_t *buf);
+bool cbmem_drv_get_cbmem_entry(uint32_t id, uint8_t **buf_out, size_t *size_out, uint64_t *addr_out);
 
 /**
  * Write provided buffer contents to the CBMEM entry.
@@ -128,8 +98,9 @@ bool cbmem_drv_write_cbmem_entry(uint32_t id, uint8_t *buf, size_t buf_size);
  *
  * @param cb user callback function to call during iteration.
  * @param data pointer to the context data for the callback.
+ * @param with_contents tells whether the callback should get NULL (false) or copy of the entry (true).
  */
-void cbmem_drv_foreach_cbmem_entry(cbmem_iterator_callback cb, void *data);
+void cbmem_drv_foreach_cbmem_entry(cbmem_iterator_callback cb, void *data, bool with_contents);
 
 /* API for accessing CBMEM via /dev/mem */
 
@@ -148,31 +119,16 @@ bool cbmem_devmem_init(bool writeable);
 void cbmem_devmem_terminate(void);
 
 /**
- * Check if CBMEM entry exists. If it does, then return address and size.
- *
- * @param id CBMEM_ID_* value.
- * @param addr_out pointer to the output buffer for entry address in physical memory.
- * @param size_out pointer to the output buffer for entry size.
- *
- * @returns true if entry exists, false otherwise.
- */
-bool cbmem_devmem_probe_cbmem_entry(uint32_t id, uint64_t *addr_out, size_t *size_out);
-
-/**
  * Get CBMEM entry as an allocated buffer.
  *
  * @param id CBMEM_ID_* value.
  * @param buf_out return pointer for the allocated buffer containing entry contents.
- * @param size_out size of returned buffer.
+ * @param size_out size of returned buffer. Optional.
+ * @param addr_out pointer to the output buffer for entry address in physical memory. Optional.
  *
  * @returns true on success, false otherwise.
  */
-bool cbmem_devmem_get_cbmem_entry(uint32_t id, uint8_t **buf_out, size_t *size_out);
-
-/**
- * Free buffer allocated by cbmem_devmem_get_cbmem_entry().
- */
-void cbmem_devmem_free_entry(uint8_t *buf);
+bool cbmem_devmem_get_cbmem_entry(uint32_t id, uint8_t **buf_out, size_t *size_out, uint64_t *addr_out);
 
 /**
  * Write provided buffer contents to the CBMEM entry.
@@ -190,8 +146,10 @@ bool cbmem_devmem_write_cbmem_entry(uint32_t id, uint8_t *buf, size_t buf_size);
  *
  * @param cb user callback function to call during iteration.
  * @param data pointer to the context data for the callback.
+ * @param with_contents tells whether the callback should get NULL (false) or copy of the entry (true).
  */
-void cbmem_devmem_foreach_cbmem_entry(cbmem_iterator_callback cb, void *data);
+void cbmem_devmem_foreach_cbmem_entry(cbmem_iterator_callback cb, void *data,
+				      bool with_contents);
 
 /* API for accessing CBMEM via sysfs entries */
 
@@ -203,31 +161,16 @@ void cbmem_devmem_foreach_cbmem_entry(cbmem_iterator_callback cb, void *data);
 bool cbmem_sysfs_init(void);
 
 /**
- * Check if CBMEM entry exists. If it does, then return address and size.
- *
- * @param id CBMEM_ID_* value.
- * @param addr_out pointer to the output buffer for entry address in physical memory.
- * @param size_out pointer to the output buffer for entry size.
- *
- * @returns true if entry exists, false otherwise.
- */
-bool cbmem_sysfs_probe_cbmem_entry(uint32_t id, uint64_t *addr_out, size_t *size_out);
-
-/**
  * Get CBMEM entry as an allocated buffer.
  *
  * @param id CBMEM_ID_* value.
  * @param buf_out return pointer for the allocated buffer containing entry contents.
  * @param size_out size of returned buffer.
+ * @param addr_out pointer to the output buffer for entry address in physical memory. Optional.
  *
  * @returns true on success, false otherwise.
  */
-bool cbmem_sysfs_get_cbmem_entry(uint32_t id, uint8_t **buf_out, size_t *size_out);
-
-/**
- * Free buffer allocated by cbmem_sysfs_get_cbmem_entry().
- */
-void cbmem_sysfs_free_entry(uint8_t *buf);
+bool cbmem_sysfs_get_cbmem_entry(uint32_t id, uint8_t **buf_out, size_t *size_out, uint64_t *addr_out);
 
 /**
  * Write provided buffer contents to the CBMEM entry.
@@ -245,5 +188,7 @@ bool cbmem_sysfs_write_cbmem_entry(uint32_t id, uint8_t *buf, size_t buf_size);
  *
  * @param cb user callback function to call during iteration.
  * @param data pointer to the context data for the callback.
+ * @param with_contents tells whether the callback should get NULL (false) or copy of the entry (true).
  */
-void cbmem_sysfs_foreach_cbmem_entry(cbmem_iterator_callback cb, void *data);
+void cbmem_sysfs_foreach_cbmem_entry(cbmem_iterator_callback cb, void *data,
+				     bool with_contents);

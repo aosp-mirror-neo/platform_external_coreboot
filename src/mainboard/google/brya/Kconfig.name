@@ -77,6 +77,9 @@ config BOARD_GOOGLE_HADES
 config BOARD_GOOGLE_KANO
 	bool "->  Kano"
 
+config BOARD_GOOGLE_KALADIN
+	bool "->  Kaladin"
+
 config BOARD_GOOGLE_KINOX
 	bool "->  Kinox"
 
@@ -218,6 +221,9 @@ config BOARD_GOOGLE_PUJJOGA
 config BOARD_GOOGLE_PUJJOGATWIN
 	bool "->  Pujjogatwin"
 
+config BOARD_GOOGLE_PUJJOLO
+	bool "->  Pujjolo"
+
 config BOARD_GOOGLE_ORISA
 	bool "->  Orisa"
 
@@ -226,3 +232,9 @@ config BOARD_GOOGLE_TELITH
 
 config BOARD_GOOGLE_MELIKS
 	bool "->  Meliks"
+
+config BOARD_GOOGLE_EPIC
+	bool "->  Epic"
+
+config BOARD_GOOGLE_PUJJOCENTO
+	bool "->  Pujjocento"

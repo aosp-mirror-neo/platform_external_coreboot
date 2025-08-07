@@ -45,6 +45,9 @@ struct clock_freq_config {
 
 struct qupv3_clock {
 	u32 cbcr;
+#if CONFIG(QC_COMMON_QUPV3_2)
+	u8 _res0[0x08];
+#endif
 	struct clock_rcg_mnd clk;
 	struct clock_rcg_dfsr dfsr_clk;
 };
@@ -165,6 +168,13 @@ enum cb_err clock_configure_enable_gpll(struct alpha_pll_reg_val_config *cfg,
 enum cb_err agera_pll_enable(struct alpha_pll_reg_val_config *cfg);
 
 enum cb_err zonda_pll_enable(struct alpha_pll_reg_val_config *cfg);
+
+/*
+ * zondaole_pll_enable(): Enable Zondaole PLL at the given configuration (cfg).
+ *
+ * @param cfg		struct alpha_pll_reg_val_config
+ */
+enum cb_err zondaole_pll_enable(struct alpha_pll_reg_val_config *cfg);
 
 struct aoss {
 	u8 _res0[0x50020];

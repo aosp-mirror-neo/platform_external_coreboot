@@ -24,6 +24,7 @@ romstage-$(CONFIG_CHROMEOS_DRAM_PART_NUMBER_IN_CBI) += dram_part_num_override.c
 
 ramstage-$(CONFIG_PLATFORM_HAS_LOW_BATTERY_INDICATOR) += battery.c
 ramstage-$(CONFIG_CHROMEOS_FW_SPLASH_SCREEN) += splash.c
+ramstage-$(CONFIG_CHROMEOS_PVMFW_CBMEM) += pvmfw_cbmem.c
 
 # Add logo to the cbfs image
 BMP_LOGO_COMPRESS_FLAG := $(CBFS_COMPRESS_FLAG)
@@ -42,5 +43,7 @@ endef
 
 $(eval $(call add_bmp_logo_file_to_cbfs,CONFIG_CHROMEOS_FW_SPLASH_SCREEN, \
 	      cb_logo.bmp,CONFIG_CHROMEOS_LOGO_PATH))
+ifneq ($(CONFIG_SPLASH_SCREEN_FOOTER),y)
 $(eval $(call add_bmp_logo_file_to_cbfs,CONFIG_CHROMEOS_FW_SPLASH_SCREEN, \
 	      cb_plus_logo.bmp,CONFIG_CHROMEBOOK_PLUS_LOGO_PATH))
+endif

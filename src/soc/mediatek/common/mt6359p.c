@@ -50,7 +50,7 @@ static void mt6359p_write(u32 reg, u32 data)
 	pmif_arb->write(pmif_arb, 0, reg, data);
 }
 
-static u32 mt6359p_read_field(u32 reg, u32 mask, u32 shift)
+u32 mt6359p_read_field(u32 reg, u32 mask, u32 shift)
 {
 	return pmif_arb->read_field(pmif_arb, 0, reg, mask, shift);
 }
@@ -190,6 +190,16 @@ void mt6359p_buck_set_voltage(u32 buck_id, u32 buck_uv)
 		vol_reg = PMIC_VPA_CON1;
 		vol_step = 50000;
 		break;
+	case MT6359P_VMODEM:
+		vol_offset = 400000;
+		vol_reg = PMIC_VMODEM_ELR0;
+		vol_step = 6250;
+		break;
+	case MT6359P_VSRAM_MD:
+		vol_offset = 500000;
+		vol_reg = PMIC_VSRAM_MD_ELR;
+		vol_step = 6250;
+		break;
 	default:
 		die("ERROR: Unknown buck_id %u", buck_id);
 		return;
@@ -236,6 +246,18 @@ u32 mt6359p_buck_get_voltage(u32 buck_id)
 		vol_offset = 500000;
 		vol_reg = PMIC_VPA_DBG0;
 		vol_step = 50000;
+		break;
+	case MT6359P_VMODEM:
+		vol_shift = 0;
+		vol_offset = 400000;
+		vol_reg = PMIC_VMODEM_DBG0;
+		vol_step = 6250;
+		break;
+	case MT6359P_VSRAM_MD:
+		vol_shift = 8;
+		vol_offset = 500000;
+		vol_reg = PMIC_VSRAM_MD_VOSEL1;
+		vol_step = 6250;
 		break;
 	default:
 		die("ERROR: Unknown buck_id %u", buck_id);

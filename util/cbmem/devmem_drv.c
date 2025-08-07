@@ -29,10 +29,6 @@
 #include <sys/sysctl.h>
 #endif
 
-#if defined(__i386__) || defined(__x86_64__)
-#include <x86intrin.h>
-#endif
-
 #include "cbmem_util.h"
 
 struct mapping {
@@ -132,15 +128,6 @@ static int unmap_memory(struct mapping *mapping)
 	return 0;
 }
 
-/* Return size of physical address mapping requested. */
-static size_t mapping_size(const struct mapping *mapping)
-{
-	if (mapping->virt == NULL)
-		return 0;
-
-	return mapping->size;
-}
-
 /*
  * Some architectures map /dev/mem memory in a way that doesn't support
  * unaligned accesses. Most normal libc memcpy()s aren't safe to use in this
@@ -203,26 +190,27 @@ static int parse_cbtable(uint64_t address, size_t table_size)
 		}
 
 		/* Map in the whole table to parse. */
-		if (!map_memory(&table_mapping, address + i + lbh->header_bytes,
-				lbh->table_bytes)) {
+		if (!map_memory(&table_mapping, address + i,
+				lbh->header_bytes + lbh->table_bytes)) {
 			debug("Couldn't map in table\n");
 			continue;
 		}
 
-		if (ipchksum(mapping_virt(&table_mapping), lbh->table_bytes) !=
+		const uint8_t *table_contents =
+			&((uint8_t *)mapping_virt(&table_mapping))[lbh->header_bytes];
+		if (ipchksum(table_contents, lbh->table_bytes) !=
 		    lbh->table_checksum) {
 			debug("Signature found, but wrong checksum.\n");
 			unmap_memory(&table_mapping);
 			continue;
 		}
 
-		debug("Found at %#lx\n", address + i);
+		debug("Found at %#" PRIx64 "\n", address + i);
 
 		const struct lb_record *lbr_p;
-		const uint8_t *lbtable = mapping_virt(&table_mapping);
 
 		for (size_t offset = 0; offset < lbh->table_bytes; offset += lbr_p->size) {
-			lbr_p = (const struct lb_record *)&lbtable[offset];
+			lbr_p = (const struct lb_record *)&table_contents[offset];
 			debug("  coreboot table entry 0x%02x\n", lbr_p->tag);
 
 			if (lbr_p->tag != LB_TAG_FORWARD)
@@ -484,20 +472,29 @@ static uint32_t cbmem_id_to_lb_tag(uint32_t tag)
 	return LB_TAG_UNUSED;
 }
 
-bool cbmem_devmem_probe_cbmem_entry(uint32_t id, uint64_t *addr_out, size_t *size_out)
+static bool cbmem_devmem_probe_cbmem_entry(uint32_t id, uint64_t *addr_out, size_t *size_out)
 {
 	const uint8_t *table;
-	size_t offset = 0;
+	const struct lb_header *lbh;
 	const uint32_t legacy_tag = cbmem_id_to_lb_tag(id);
 	struct lb_cbmem_ref *ref = NULL;
+	const struct lb_record *lbr = NULL;
 
 	table = mapping_virt(&lbtable_mapping);
-
 	if (table == NULL)
 		die("No correct coreboot table found\n");
 
-	const struct lb_record *lbr = NULL;
-	while (offset < mapping_size(&lbtable_mapping)) {
+	lbh = (const struct lb_header *)table;
+	table = &table[lbh->header_bytes];
+
+	/* Fast track for the coreboot table. */
+	if (id == CBMEM_ID_CBTABLE) {
+		*addr_out = lbtable_mapping.phys;
+		*size_out = lbtable_mapping.size;
+		return true;
+	}
+
+	for (size_t offset = 0; offset < lbh->table_bytes - sizeof(struct lb_cbmem_entry);) {
 		lbr = (const void *)(table + offset);
 		offset += lbr->size;
 
@@ -571,6 +568,8 @@ bool cbmem_devmem_probe_cbmem_entry(uint32_t id, uint64_t *addr_out, size_t *siz
 	}
 	}
 
+	unmap_memory(&entry_mapping);
+
 	return true;
 }
 
@@ -592,7 +591,8 @@ static void fetch_cbmem_entry(const uint32_t id, const uint64_t addr, const size
 	unmap_memory(&cbmem_mapping);
 }
 
-bool cbmem_devmem_get_cbmem_entry(uint32_t id, uint8_t **buf_out, size_t *size_out)
+bool cbmem_devmem_get_cbmem_entry(uint32_t id, uint8_t **buf_out, size_t *size_out,
+				  uint64_t *addr_out)
 {
 	uint64_t addr;
 	size_t size;
@@ -603,14 +603,13 @@ bool cbmem_devmem_get_cbmem_entry(uint32_t id, uint8_t **buf_out, size_t *size_o
 	}
 
 	fetch_cbmem_entry(id, addr, size, buf_out);
-	*size_out = size;
+
+	if (size_out)
+		*size_out = size;
+	if (addr_out)
+		*addr_out = addr;
 
 	return true;
-}
-
-void cbmem_devmem_free_entry(uint8_t *buf)
-{
-	free(buf);
 }
 
 bool cbmem_devmem_write_cbmem_entry(uint32_t id, uint8_t *buf, size_t buf_size)
@@ -640,31 +639,37 @@ bool cbmem_devmem_write_cbmem_entry(uint32_t id, uint8_t *buf, size_t buf_size)
 	return true;
 }
 
-void cbmem_devmem_foreach_cbmem_entry(cbmem_iterator_callback cb, void *data)
+void cbmem_devmem_foreach_cbmem_entry(cbmem_iterator_callback cb, void *data,
+				      bool with_contents)
 {
 	uint8_t *table = NULL;
 	size_t table_size = 0;
 
-	if (!cbmem_devmem_get_cbmem_entry(CBMEM_ID_CBTABLE, &table, &table_size))
+	if (!cbmem_devmem_get_cbmem_entry(CBMEM_ID_CBTABLE, &table, &table_size, NULL))
 		die("coreboot table not found.\n");
 
 	const struct lb_header *lbh = (const struct lb_header *)table;
 	const struct lb_record *lbr = NULL;
 	bool should_iteration_end = false;
-	for (size_t offset = 0; offset < lbh->table_bytes - sizeof(struct lb_cbmem_entry) &&
-				should_iteration_end == false;
-	     offset += lbr->size) {
-		lbr = (const struct lb_record *)&table[offset];
+	size_t offset = 0;
+	while (offset < lbh->table_bytes - sizeof(struct lb_cbmem_entry) &&
+	       should_iteration_end == false) {
+		lbr = (const struct lb_record *)&table[lbh->header_bytes + offset];
+		offset += lbr->size;
 
 		if (lbr->tag != LB_TAG_CBMEM_ENTRY)
 			continue;
 
 		const struct lb_cbmem_entry *lbe = (const struct lb_cbmem_entry *)lbr;
 		uint8_t *buf = NULL;
-		fetch_cbmem_entry(lbe->id, lbe->address, lbe->entry_size, &buf);
+		if (with_contents)
+			fetch_cbmem_entry(lbe->id, lbe->address, lbe->entry_size, &buf);
+
 		should_iteration_end = cb(lbe->id, lbe->address, buf, lbe->entry_size, data);
-		cbmem_devmem_free_entry(buf);
+
+		if (with_contents)
+			free(buf);
 	}
 
-	cbmem_devmem_free_entry(table);
+	free(table);
 }

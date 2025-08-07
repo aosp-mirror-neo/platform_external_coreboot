@@ -524,7 +524,7 @@ int amdfwtool_getopt(int argc, char *argv[], amd_cb_config *cb_config, context *
 			sub = instance = 0;
 			break;
 		case AMDFW_OPT_SIGNED_ADDR:
-			cb_config->signed_start_addr = strtoull(optarg, NULL, 10);
+			cb_config->signed_start_addr = strtoull(optarg, NULL, 16);
 			sub = instance = 0;
 			break;
 		case LONGOPT_SPI_READ_MODE:
@@ -601,8 +601,7 @@ int amdfwtool_getopt(int argc, char *argv[], amd_cb_config *cb_config, context *
 			break;
 		case AMDFW_OPT_HELP:
 			usage();
-			retval = 1;
-			break;
+			return 1;
 		case AMDFW_OPT_BODY_LOCATION:
 			cb_config->body_location = (uint32_t)strtoul(optarg, &tmp, 16);
 			if (*tmp != '\0') {
@@ -638,16 +637,6 @@ int amdfwtool_getopt(int argc, char *argv[], amd_cb_config *cb_config, context *
 	}
 
 	printf("    AMDFWTOOL  Using ROM size of %dKB\n", ctx->rom_size / 1024);
-
-	if (ctx->rom_size <= MAX_MAPPED_WINDOW) {
-		uint32_t rom_base_address;
-
-		rom_base_address = 0xFFFFFFFF - ctx->rom_size + 1;
-		if (cb_config->efs_location & ~MAX_MAPPED_WINDOW_MASK)
-			cb_config->efs_location = cb_config->efs_location - rom_base_address;
-		if (cb_config->body_location & ~MAX_MAPPED_WINDOW_MASK)
-			cb_config->body_location = cb_config->body_location - rom_base_address;
-	}
 
 	/* If the flash size is larger than 16M, we assume the given
 	   addresses are already relative ones. Otherwise we print error.*/

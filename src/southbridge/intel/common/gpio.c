@@ -1,11 +1,14 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 
+#include <assert.h>
 #include <arch/io.h>
 #include <device/pci_ops.h>
 #include <device/pci_type.h>
+#include <gpio.h>
 #include <stdint.h>
+#include <gpio.h>
 
-#include "gpio.h"
+#include "southbridge/intel/common/gpio.h"
 
 #define MAX_GPIO_NUMBER 75 /* zero based */
 
@@ -84,7 +87,7 @@ void setup_pch_gpios(const struct pch_gpio_map *gpio)
 /*
  * return current gpio level.
  */
-int get_gpio(int gpio_num)
+int gpio_get(gpio_t gpio_num)
 {
 	static const int gpio_reg_offsets[] = {GP_LVL, GP_LVL2, GP_LVL3};
 	u16 gpio_base = get_gpio_base();
@@ -100,28 +103,9 @@ int get_gpio(int gpio_num)
 }
 
 /*
- * get a number comprised of multiple GPIO values. gpio_num_array points to
- * the array of gpio pin numbers to scan, terminated by -1.
- */
-unsigned int get_gpios(const int *gpio_num_array)
-{
-	int gpio;
-	unsigned int bitmask = 1;
-	unsigned int vector = 0;
-
-	while (bitmask &&
-	       ((gpio = *gpio_num_array++) != -1)) {
-		if (get_gpio(gpio))
-			vector |= bitmask;
-		bitmask <<= 1;
-	}
-	return vector;
-}
-
-/*
  * set gpio output to level.
  */
-void set_gpio(int gpio_num, int value)
+void gpio_set(gpio_t gpio_num, int value)
 {
 	static const int gpio_reg_offsets[] = {
 		GP_LVL, GP_LVL2, GP_LVL3
@@ -160,4 +144,81 @@ int gpio_is_native(int gpio_num)
 
 	config = inl(gpio_base + gpio_reg_offsets[index]);
 	return !(config & (1 << bit));
+}
+
+static void gpio_set_gpio(gpio_t gpio_num)
+{
+	static const int gpio_use_reg_offsets[] = {
+		GPIO_USE_SEL, GPIO_USE_SEL2, GPIO_USE_SEL3
+	};
+	u16 gpio_base = get_gpio_base();
+	int index, bit;
+	u32 config;
+
+	if (gpio_num > MAX_GPIO_NUMBER)
+		return; /* Just ignore wrong gpio numbers. */
+
+	index = gpio_num / 32;
+	bit = gpio_num % 32;
+
+	config = inl(gpio_base + gpio_use_reg_offsets[index]);
+	if (config & (GPIO_MODE_GPIO << bit))
+		return;
+
+	config |= GPIO_MODE_GPIO << bit;
+	outl(gpio_base + gpio_use_reg_offsets[index], config);
+}
+
+void gpio_input(gpio_t gpio_num)
+{
+	static const int gpio_io_reg_offsets[] = {
+		GP_IO_SEL, GP_IO_SEL2, GP_IO_SEL3
+	};
+	u16 gpio_base = get_gpio_base();
+	int index, bit;
+	u32 config;
+
+	if (gpio_num > MAX_GPIO_NUMBER)
+		return; /* Just ignore wrong gpio numbers. */
+
+	gpio_set_gpio(gpio_num);
+
+	index = gpio_num / 32;
+	bit = gpio_num % 32;
+
+	config = inl(gpio_base + gpio_io_reg_offsets[index]);
+	if (((config >> bit) & 1) == GPIO_DIR_INPUT)
+		return;
+
+	config |= 1 << bit;
+	outl(gpio_base + gpio_io_reg_offsets[index], config);
+}
+
+void gpio_output(gpio_t gpio_num, int value)
+{
+	static const int gpio_io_reg_offsets[] = {
+		GP_IO_SEL, GP_IO_SEL2, GP_IO_SEL3
+	};
+	u16 gpio_base = get_gpio_base();
+	int index, bit;
+	u32 config;
+
+	if (gpio_num > MAX_GPIO_NUMBER)
+		return; /* Just ignore wrong gpio numbers. */
+
+	gpio_set_gpio(gpio_num);
+	gpio_set(gpio_num, value);
+
+	index = gpio_num / 32;
+	bit = gpio_num % 32;
+
+	config = inl(gpio_base + gpio_io_reg_offsets[index]);
+	if (((config >> bit) & 1) == GPIO_DIR_OUTPUT)
+		return;
+
+	config &= ~(1 << bit);
+	outl(gpio_base + gpio_io_reg_offsets[index], config);
+
+	/* Set value again in case output register was gated */
+	gpio_set(gpio_num, value);
 }

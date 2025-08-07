@@ -17,11 +17,16 @@
 #include <assert.h>
 #include <regex.h>
 #include <commonlib/bsd/cbmem_id.h>
+#include <commonlib/bsd/helpers.h>
 #include <commonlib/bsd/tpm_log_defs.h>
 #include <commonlib/loglevel.h>
 #include <commonlib/timestamp_serialized.h>
 #include <commonlib/tpm_log_serialized.h>
 #include <commonlib/coreboot_tables.h>
+
+#if defined(__i386__) || defined(__x86_64__)
+#include <x86intrin.h>
+#endif
 
 #include "cbmem_util.h"
 
@@ -130,30 +135,61 @@ static void print_norm(uint64_t v)
 }
 
 #if defined(__i386__) || defined(__x86_64__)
-static uint32_t get_tsc_freq_khz(void)
+static void cbmem_get_lb_table_entry(uint32_t tag, uint8_t **buf_out, size_t *size_out)
 {
+	const struct lb_record *lbr_p;
+	const uint8_t *lbtable_raw;
+	bool tag_found = false;
+
+	if (!cbmem_drv_get_cbmem_entry(CBMEM_ID_CBTABLE, (uint8_t **)&lbtable_raw, NULL, NULL))
+		die("coreboot table not found.\n");
+
+	const struct lb_header *lbh = (const struct lb_header *)lbtable_raw;
+
+	for (size_t i = 0; i < lbh->table_bytes - sizeof(struct lb_record); i += lbr_p->size) {
+		lbr_p = (const struct lb_record *)(&lbtable_raw[lbh->header_bytes + i]);
+		if (lbr_p->tag == tag) {
+			tag_found = true;
+			break;
+		}
+	}
+
+	if (!tag_found) {
+		free((void *)lbtable_raw);
+		die("coreboot table entry %#x not found.\n", tag);
+	}
+
+	debug("coreboot table entry %#x found.\n", tag);
+
+	*buf_out = malloc(lbr_p->size);
+	if (!*buf_out) {
+		free((void *)lbtable_raw);
+		die("Unable to allocate memory for coreboot table entry %#x, size: %d\n", tag,
+		    lbr_p->size);
+	}
+	memcpy(*buf_out, lbr_p, lbr_p->size);
+	*size_out = lbr_p->size;
+	free((void *)lbtable_raw);
+}
+#endif /* defined(__i386__) || defined(__x86_64__) */
+
+static uint64_t timestamp_get(uint64_t table_tick_freq_mhz)
+{
+#if defined(__i386__) || defined(__x86_64__)
+	uint64_t tsc = __rdtsc();
 	struct lb_tsc_info *tsc_info;
 	size_t size;
+
+	/* No tick frequency specified means raw TSC values. */
+	if (!table_tick_freq_mhz)
+		return tsc;
 
 	cbmem_get_lb_table_entry(LB_TAG_TSC_INFO, (uint8_t **)&tsc_info, &size);
 
 	const uint32_t tsc_freq_khz = tsc_info->freq_khz;
 
 	free(tsc_info);
-	return tsc_freq_khz;
-}
-#endif
 
-static uint64_t timestamp_get(uint64_t table_tick_freq_mhz)
-{
-#if defined(__i386__) || defined(__x86_64__)
-	uint64_t tsc = __rdtsc();
-
-	/* No tick frequency specified means raw TSC values. */
-	if (!table_tick_freq_mhz)
-		return tsc;
-
-	const uint32_t tsc_freq_khz = get_tsc_freq_khz();
 	if (tsc_freq_khz)
 		return tsc * table_tick_freq_mhz * 1000 / tsc_freq_khz;
 #else
@@ -301,7 +337,7 @@ static void dump_timestamps(enum timestamps_print_type output_type)
 	uint64_t prev_stamp = 0;
 	uint64_t total_time = 0;
 
-	if (!cbmem_drv_get_cbmem_entry(CBMEM_ID_TIMESTAMP, (uint8_t **)&tst_p, &size))
+	if (!cbmem_drv_get_cbmem_entry(CBMEM_ID_TIMESTAMP, (uint8_t **)&tst_p, &size, NULL))
 		die("Timestamps not found.\n");
 
 	timestamp_set_tick_freq(tst_p->tick_freq_mhz);
@@ -401,7 +437,7 @@ static void timestamp_add_now(uint32_t timestamp_id)
 	struct timestamp_table *tst_p;
 	size_t tst_size;
 
-	if (!cbmem_drv_get_cbmem_entry(CBMEM_ID_TIMESTAMP, (uint8_t **)&tst_p, &tst_size))
+	if (!cbmem_drv_get_cbmem_entry(CBMEM_ID_TIMESTAMP, (uint8_t **)&tst_p, &tst_size, NULL))
 		die("Unable to find timestamps.\n");
 
 	/*
@@ -420,7 +456,7 @@ static void timestamp_add_now(uint32_t timestamp_id)
 
 	if (!cbmem_drv_write_cbmem_entry(CBMEM_ID_TIMESTAMP, (uint8_t *)tst_p, tst_size))
 		die("Unable to write timestamps.\n");
-	cbmem_drv_free_entry((uint8_t *)tst_p);
+	free((uint8_t *)tst_p);
 }
 
 static bool can_print(const uint8_t *data, size_t len)
@@ -637,9 +673,8 @@ static void dump_tpm_std_log(void *buf)
 static void dump_tpm_cb_log(void)
 {
 	const struct tpm_cb_log_table *tclt_p;
-	size_t tclt_size;
 
-	if (!cbmem_drv_get_cbmem_entry(CBMEM_ID_TPM_CB_LOG, (uint8_t **)&tclt_p, &tclt_size))
+	if (!cbmem_drv_get_cbmem_entry(CBMEM_ID_TPM_CB_LOG, (uint8_t **)&tclt_p, NULL, NULL))
 		die("coreboot TPM log not found.\n");
 
 	printf("coreboot TPM log:\n\n");
@@ -652,18 +687,17 @@ static void dump_tpm_cb_log(void)
 		printf(" %s [%s]\n", tce->digest_type, tce->name);
 	}
 
-	cbmem_drv_free_entry((uint8_t *)tclt_p);
+	free((uint8_t *)tclt_p);
 }
 
 static void dump_tpm_log(void)
 {
 	uint8_t *buf;
-	size_t size;
 
-	if (cbmem_drv_get_cbmem_entry(CBMEM_ID_TCPA_TCG_LOG, &buf, &size) ||
-	    cbmem_drv_get_cbmem_entry(CBMEM_ID_TPM2_TCG_LOG, &buf, &size)) {
+	if (cbmem_drv_get_cbmem_entry(CBMEM_ID_TCPA_TCG_LOG, &buf, NULL, NULL) ||
+	    cbmem_drv_get_cbmem_entry(CBMEM_ID_TPM2_TCG_LOG, &buf, NULL, NULL)) {
 		dump_tpm_std_log(buf);
-		cbmem_drv_free_entry(buf);
+		free(buf);
 	} else
 		dump_tpm_cb_log();
 }
@@ -703,9 +737,8 @@ static void dump_console(enum console_print_type type, int max_loglevel, int pri
 	const struct cbmem_console *console_p;
 	char *console_c;
 	size_t size, cursor, previous;
-	size_t console_buf_size;
 
-	if (!cbmem_drv_get_cbmem_entry(CBMEM_ID_CONSOLE, (uint8_t **)&console_p, &console_buf_size))
+	if (!cbmem_drv_get_cbmem_entry(CBMEM_ID_CONSOLE, (uint8_t **)&console_p, NULL, NULL))
 		die("CBMEM console not found.\n");
 
 	cursor = console_p->cursor & CBMC_CURSOR_MASK;
@@ -716,7 +749,7 @@ static void dump_console(enum console_print_type type, int max_loglevel, int pri
 
 	console_c = malloc(size + 1);
 	if (!console_c) {
-		cbmem_drv_free_entry((uint8_t *)console_p);
+		free((uint8_t *)console_p);
 		die("Not enough memory for console.\n");
 	}
 	console_c[size] = '\0';
@@ -805,9 +838,38 @@ static void dump_console(enum console_print_type type, int max_loglevel, int pri
 		printf(BIOS_LOG_ESCAPE_RESET);
 
 	free(console_c);
-	cbmem_drv_free_entry((uint8_t *)console_p);
+	free((uint8_t *)console_p);
 }
 
+static void hexdump(const uintptr_t start_address, const uint8_t *buf, const int length)
+{
+	int i;
+	int all_zero = 0;
+
+	for (i = 0; i < length; i += 16) {
+		int j;
+
+		all_zero++;
+		for (j = 0; j < 16; j++) {
+			if (buf[i + j] != 0) {
+				all_zero = 0;
+				break;
+			}
+		}
+
+		if (all_zero < 2) {
+			printf("%08" PRIxPTR ":", start_address + i);
+			for (j = 0; j < 16; j++)
+				printf(" %02x", buf[i + j]);
+			printf("  ");
+			for (j = 0; j < 16; j++)
+				printf("%c", isprint(buf[i + j]) ? buf[i + j] : '.');
+			printf("\n");
+		} else if (all_zero == 2) {
+			printf("...\n");
+		}
+	}
+}
 
 static bool hexdump_handler(const uint32_t id, const uint64_t physical_address, const uint8_t *buf,
 		 const size_t size, void *data)
@@ -820,7 +882,7 @@ static bool hexdump_handler(const uint32_t id, const uint64_t physical_address, 
 
 static void dump_cbmem_hex(void)
 {
-	cbmem_drv_foreach_cbmem_entry(hexdump_handler, NULL);
+	cbmem_drv_foreach_cbmem_entry(hexdump_handler, NULL, true);
 }
 
 static void dump_cbmem_raw(unsigned int id)
@@ -828,12 +890,52 @@ static void dump_cbmem_raw(unsigned int id)
 	uint8_t *buf;
 	size_t size;
 
-	if (!cbmem_drv_get_cbmem_entry(id, &buf, &size))
+	if (!cbmem_drv_get_cbmem_entry(id, &buf, &size, NULL))
 		die("cbmem entry id: %#x not found.\n", id);
 
 	fwrite(buf, 1, size, stdout);
 
-	cbmem_drv_free_entry(buf);
+	free(buf);
+}
+
+struct cbmem_id_to_name {
+	uint32_t id;
+	const char *name;
+};
+static const struct cbmem_id_to_name cbmem_ids[] = { CBMEM_ID_TO_NAME_TABLE };
+
+#define MAX_STAGEx 10
+static void cbmem_print_entry(int n, uint32_t id, uint64_t base, uint64_t size)
+{
+	const char *name;
+	char stage_x[20];
+
+	name = NULL;
+	for (size_t i = 0; i < ARRAY_SIZE(cbmem_ids); i++) {
+		if (cbmem_ids[i].id == id) {
+			name = cbmem_ids[i].name;
+			break;
+		}
+		if (id >= CBMEM_ID_STAGEx_META &&
+			id < CBMEM_ID_STAGEx_META + MAX_STAGEx) {
+			snprintf(stage_x, sizeof(stage_x), "STAGE%d META",
+				(id - CBMEM_ID_STAGEx_META));
+			name = stage_x;
+		}
+		if (id >= CBMEM_ID_STAGEx_CACHE &&
+			id < CBMEM_ID_STAGEx_CACHE + MAX_STAGEx) {
+			snprintf(stage_x, sizeof(stage_x), "STAGE%d $  ",
+				(id - CBMEM_ID_STAGEx_CACHE));
+			name = stage_x;
+		}
+	}
+
+	printf("%2d. ", n);
+	if (name == NULL)
+		name = "(unknown)";
+	printf("%-20s  %08x", name, id);
+	printf("  %08" PRIx64 " ", base);
+	printf(" %08" PRIx64 "\n", size);
 }
 
 static bool toc_handler(const uint32_t id, const uint64_t physical_address, const uint8_t *buf,
@@ -856,7 +958,7 @@ static void dump_cbmem_toc(void)
 	printf("CBMEM table of contents:\n");
 	printf("    %-20s  %-8s  %-8s  %-8s\n", "NAME", "ID", "START", "LENGTH");
 
-	cbmem_drv_foreach_cbmem_entry(toc_handler, &i);
+	cbmem_drv_foreach_cbmem_entry(toc_handler, &i, false);
 }
 
 #define COVERAGE_MAGIC 0x584d4153
@@ -890,12 +992,10 @@ static void dump_coverage(void)
 {
 	uint64_t start;
 	uint8_t *coverage;
-	size_t size;
 	unsigned long phys_offset;
 #define phys_to_virt(x) ((void *)(unsigned long)(x) + phys_offset)
 
-	if (!cbmem_drv_get_cbmem_entry(CBMEM_ID_COVERAGE, &coverage, &size) ||
-	    !cbmem_drv_probe_cbmem_entry(CBMEM_ID_COVERAGE, &start, &size))
+	if (!cbmem_drv_get_cbmem_entry(CBMEM_ID_COVERAGE, &coverage, NULL, &start))
 		die("No coverage information found\n");
 
 	/* Map coverage area */
@@ -1031,6 +1131,7 @@ int main(int argc, char** argv)
 				backend_type = CBMEM_DRV_BACKEND_ANY;
 			else
 				die("Unrecognized backend type: '%s'\n", optarg);
+			break;
 
 		case '1':
 			print_console = 1;
@@ -1107,8 +1208,16 @@ int main(int argc, char** argv)
 		print_usage(argv[0], 1);
 	}
 
-	if (!cbmem_drv_init(backend_type, timestamp_id != 0))
-		die("Unable to initialize /dev/mem access to coreboot tables and CBMEM.\n");
+	if (print_hexdump) {
+		debug("Hexdump requested. CBMEM backend force-set to DEVMEM.\n");
+		backend_type = CBMEM_DRV_BACKEND_DEVMEM;
+	}
+
+	if (!cbmem_drv_init(backend_type, timestamp_id != 0)) {
+		if (print_hexdump)
+			fprintf(stderr, "Hexdump is only available on systems with /dev/mem.\n");
+		die("Unable to initialize CBMEM access. Check if you have either /dev/mem access or sysfs CBMEM entries.\n");
+	}
 
 	if (print_console)
 		dump_console(console_type, max_loglevel, print_unknown_logs);

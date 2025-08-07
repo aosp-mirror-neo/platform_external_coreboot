@@ -3,6 +3,7 @@
 #include <bootmem.h>
 #include <device/device.h>
 #include <device/pci.h>
+#include <soc/dcc.h>
 #include <soc/dramc_info.h>
 #include <soc/emi.h>
 #include <soc/gpueb.h>
@@ -35,26 +36,14 @@ static void soc_read_resources(struct device *dev)
 	ram_range(dev, 0, (uintptr_t)_dram, sdram_size());
 }
 
-static void add_pi_image_params(void)
-{
-	void *pi_image;
-	size_t pi_image_size;
-	pi_image_size = pi_image_load(&pi_image);
-
-	void *csram = (void *)PI_IMAGE_CSRAM;
-	size_t csram_size = PI_IMAGE_CSRAM_SIZE;
-
-	mtk_fsp_add_param(FSP_PARAM_TYPE_PI_IMG, pi_image_size, pi_image);
-	mtk_fsp_add_param(FSP_PARAM_TYPE_PI_IMG_CSRAM, csram_size, csram);
-}
-
 static void soc_init(struct device *dev)
 {
 	uint32_t storage_type = mainboard_get_storage_type();
 
+	dcc_init();
 	mtk_fsp_init(RAMSTAGE_SOC_INIT);
 	mtk_fsp_add_param(FSP_PARAM_TYPE_STORAGE, sizeof(storage_type), &storage_type);
-	add_pi_image_params();
+	pi_image_add_mtk_fsp_params();
 	mtk_fsp_load_and_run();
 
 	mtk_mmu_disable_l2c_sram();

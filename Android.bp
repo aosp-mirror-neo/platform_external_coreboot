@@ -51,6 +51,9 @@ cc_defaults {
         "-Wno-sign-compare",
         "-Wno-cast-qual",
 
+        /* TODO(b/436814456): Remove these warning options once clang supports __nonstring__ */
+        "-Wno-error=unknown-attributes",
+
         "-D_DEFAULT_SOURCE",
         "-D_GNU_SOURCE",
 
@@ -183,10 +186,9 @@ cc_binary {
     vendor: true,
     srcs: [
         "util/cbmem/cbmem.c",
-        "util/cbmem/cbmem_drv.c",
-        "util/cbmem/common.c",
-        "util/cbmem/devmem_drv.c",
-        "util/cbmem/sysfs_drv.c",
+	"util/cbmem/cbmem_drv.c",
+	"util/cbmem/devmem_drv.c",
+	"util/cbmem/sysfs_drv.c",
         "src/commonlib/bsd/ipchksum.c",
     ],
 }

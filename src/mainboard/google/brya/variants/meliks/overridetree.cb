@@ -7,6 +7,13 @@ chip soc/intel/alderlake
 
 	register "sagv" = "SaGv_Enabled"
 
+	# Acoustic settings
+	register "acoustic_noise_mitigation" = "1"
+	register "slow_slew_rate[VR_DOMAIN_IA]" = "SLEW_FAST_8"
+	register "slow_slew_rate[VR_DOMAIN_GT]" = "SLEW_FAST_8"
+	register "fast_pkg_c_ramp_disable[VR_DOMAIN_IA]" = "1"
+	register "fast_pkg_c_ramp_disable[VR_DOMAIN_GT]" = "1"
+
 	# SOC Aux orientation override:
 	# This is a bitfield that corresponds to up to 4 TCSS ports.
 	# Bits (0,1) allocated for TCSS Port1 configuration and Bits (2,3)for TCSS Port2.
@@ -77,40 +84,8 @@ chip soc/intel/alderlake
 		[PchSerialIoIndexI2C5] = PchSerialIoPci,
 	}"
 
-	# Configure external V1P05/Vnn/VnnSx Rails
-	register "ext_fivr_settings" = "{
-		.configure_ext_fivr = 1,
-		.v1p05_enable_bitmap = FIVR_ENABLE_ALL_SX & ~FIVR_ENABLE_S0,
-		.vnn_enable_bitmap = FIVR_ENABLE_ALL_SX ,
-		.vnn_sx_enable_bitmap = FIVR_ENABLE_ALL_SX ,
-		.v1p05_supported_voltage_bitmap = FIVR_VOLTAGE_NORMAL,
-		.vnn_supported_voltage_bitmap = FIVR_VOLTAGE_MIN_RETENTION,
-		.v1p05_voltage_mv = 1050,
-		.vnn_voltage_mv = 780,
-		.vnn_sx_voltage_mv = 1050,
-		.v1p05_icc_max_ma = 500,
-		.vnn_icc_max_ma = 500,
-	}"
-
-	# VR Settings
-	register "domain_vr_config[VR_DOMAIN_IA]" = "{
-		.vr_config_enable = 1,
-		.tdc_timewindow = 1000,
-		.ac_loadline = 500,
-		.dc_loadline = 500,
-		.psi1threshold = VR_CFG_AMP(20),
-		.psi2threshold = VR_CFG_AMP(5),
-		.psi3threshold = VR_CFG_AMP(1),
-	}"
-
-	register "domain_vr_config[VR_DOMAIN_GT]" = "{
-		.vr_config_enable = 1,
-		.tdc_timewindow = 1000,
-		.psi1threshold = VR_CFG_AMP(13),
-		.psi2threshold = VR_CFG_AMP(5),
-		.psi3threshold = VR_CFG_AMP(1),
-
-	}"
+	# 25A of Vcc In Aux Imon Iccmax value for VCCANA MBVR design
+	register "vccin_aux_imon_iccmax" = "PD_TIER_PREMIUM" # 25A
 
 	# Enable the Cnvi BT Audio Offload
 	register "cnvi_bt_audio_offload" = "1"
@@ -271,6 +246,11 @@ chip soc/intel/alderlake
 				register "generic.reset_delay_ms" = "200"
 				register "generic.reset_off_delay_ms" = "2"
 				register "generic.has_power_resource" = "1"
+				register "generic.use_gpio_for_status" = "true"
+				register "generic.property_count" = "1"
+				register "generic.property_list[0].type" = "ACPI_DP_TYPE_REFERENCE"
+				register "generic.property_list[0].name" = ""panel""
+				register "generic.property_list[0].string" = ""\\_SB.PCI0.GFX0.LCD0""
 				register "hid_desc_reg_offset" = "0x1"
 				device i2c 4F on end
 			end
@@ -407,13 +387,18 @@ chip soc/intel/alderlake
 		end
 		device ref pcie_rp7 off end
 		device ref pcie_rp9 off end
+		device ref emmc on
+			probe STORAGE STORAGE_EMMC
+		end
 		device ref ish on
 			chip drivers/intel/ish
 				register "add_acpi_dma_property" = "true"
 				device generic 0 on end
 			end
 		end
-		device ref ufs on end
+		device ref ufs on
+			probe STORAGE STORAGE_UFS
+		end
 		device ref pch_espi on
 			chip ec/google/chromeec
 				use conn0 as mux_conn[0]

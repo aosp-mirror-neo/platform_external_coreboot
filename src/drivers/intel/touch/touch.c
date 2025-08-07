@@ -194,6 +194,10 @@ static void touch_generate_acpi_crs(const struct drivers_intel_touch_config *con
 	       touch_acpi_name(dev));
 	acpigen_write_name("_CRS");
 	acpigen_write_resourcetemplate_header();
+	/*
+	 * NOTE: config->wake_gpio: uses GpioInt() in _CRS; PAD needs to be Driver Mode
+	 *       config->wake_irq:  uses Interrupt() in _CRS; use GPE; PAD needs to be ACPI Mode
+	 */
 	if (config->wake_gpio.pin_count)
 		acpi_device_write_gpio(&config->wake_gpio);
 	else if (config->wake_irq.pin)
@@ -201,7 +205,8 @@ static void touch_generate_acpi_crs(const struct drivers_intel_touch_config *con
 	acpigen_write_resourcetemplate_footer();
 
 	acpigen_write_name_integer("_S0W", ACPI_DEVICE_SLEEP_D3_HOT);
-	acpigen_write_PRW(config->wake_gpe, 3);
+	if (config->wake_irq.pin)
+		acpigen_write_PRW(config->wake_gpe, 3);
 }
 
 static void touch_generate_acpi_i2cdev_dsd(const struct device *dev)
@@ -505,11 +510,10 @@ static void touch_dev_fill_ssdt_generator(const struct device *dev)
 			touch_generate_acpi_ini(dev);
 			touch_generate_acpi_dsm(config, dev);
 			/* When only THC1 is used, both THC0/1 need to be enabled since THC0's
-			 * device function is '0'. In this case, THC0 should set
-			 * connected_device to TH_SENSOR_NONE so that when the driver detects
-			 * THC0, the _DSM will be available for it to check and exit without
-			 * error.
-			 */
+			   device function is '0'. In this case, THC0 should set
+			   connected_device to TH_SENSOR_NONE so that when the driver detects
+			   THC0, the _DSM will be available for it to check and exit without
+			   error. */
 			if (config->connected_device == TH_SENSOR_NONE)
 				return;
 
@@ -576,6 +580,10 @@ static const unsigned short pci_device_ids[] = {
 	PCI_DID_INTEL_PTL_H_THC0_SPI,
 	PCI_DID_INTEL_PTL_H_THC1_I2C,
 	PCI_DID_INTEL_PTL_H_THC1_SPI,
+	PCI_DID_INTEL_WCL_THC0_I2C,
+	PCI_DID_INTEL_WCL_THC0_SPI,
+	PCI_DID_INTEL_WCL_THC1_I2C,
+	PCI_DID_INTEL_WCL_THC1_SPI,
 	0
 };
 

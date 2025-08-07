@@ -35,7 +35,6 @@ chip soc/intel/cannonlake
 		.tdp_pl1_override = 15,
 		.tdp_pl2_override = 64,
 	}"
-	register "Device4Enable" = "1"
 	# Enable eDP device
 	register "DdiPortEdp" = "1"
 	# Enable HPD for DDI ports B/C
@@ -162,7 +161,6 @@ chip soc/intel/cannonlake
 	register "usb3_ports[4]" = "USB3_PORT_DEFAULT(OC_SKIP)"	# WWAN
 
 	# Enable Root port 9(x4) for NVMe.
-	register "PcieRpEnable[8]" = "true"
 	register "PcieRpLtrEnable[8]" = "true"
 	# RP 9 uses CLK SRC 1
 	register "PcieClkSrcUsage[1]" = "8"
@@ -170,7 +168,6 @@ chip soc/intel/cannonlake
 	register "PcieClkSrcClkReq[1]" = "1"
 
 	# PCIe port 14 for M.2 E-key WLAN
-	register "PcieRpEnable[13]" = "true"
 	register "PcieRpLtrEnable[13]" = "true"
 	# RP 14 uses CLK SRC 3
 	register "PcieClkSrcUsage[3]" = "13"
@@ -197,6 +194,7 @@ chip soc/intel/cannonlake
 
 	device domain 0 on
 		device ref igpu		on end
+		device ref dptf		on end
 		device ref thermal	on end
 		device ref xhci		on
 			chip drivers/usb/acpi
@@ -284,14 +282,14 @@ chip soc/intel/cannonlake
 		device ref sata		on end
 		device ref i2c4		on end
 		device ref pcie_rp9	on
-			register "PcieRpSlotImplemented[8]" = "1"
+			register "PcieRpSlotImplemented[8]" = "true"
 		end # (x4 NVMe)
 		device ref pcie_rp14	on
 			chip drivers/wifi/generic
 				register "wake" = "GPE0_DW1_01"
 				device generic 0 on  end
 			end
-			register "PcieRpSlotImplemented[13]" = "1"
+			register "PcieRpSlotImplemented[13]" = "true"
 		end # (x1 WiFi)
 		device ref uart0	on end
 		device ref gspi0	on

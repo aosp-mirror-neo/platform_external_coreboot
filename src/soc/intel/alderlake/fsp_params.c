@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 
 #include <assert.h>
+#include <boot/coreboot_tables.h>
 #include <bootmode.h>
 #include <bootsplash.h>
 #include <console/console.h>
@@ -517,6 +518,9 @@ static uint16_t get_vccin_aux_imon_iccmax(const struct soc_intel_alderlake_confi
 	case PCI_DID_INTEL_ADL_S_ID_10:
 	case PCI_DID_INTEL_ADL_S_ID_11:
 	case PCI_DID_INTEL_ADL_S_ID_12:
+	case PCI_DID_INTEL_ASL_ID_1:
+	case PCI_DID_INTEL_ASL_ID_2:
+	case PCI_DID_INTEL_ASL_ID_3:
 	case PCI_DID_INTEL_RPL_HX_ID_1:
 	case PCI_DID_INTEL_RPL_HX_ID_2:
 	case PCI_DID_INTEL_RPL_HX_ID_3:
@@ -711,6 +715,31 @@ static void fill_fsps_xhci_params(FSP_S_CONFIG *s_cfg,
 			s_cfg->Usb3HsioTxDownscaleAmpEnable[i] = 1;
 			s_cfg->Usb3HsioTxDownscaleAmp[i] =
 				config->usb3_ports[i].tx_downscale_amp;
+		}
+		if (config->usb3_ports[i].tx_rate2_uniq_tran) {
+			s_cfg->Usb3HsioTxRate2UniqTranEnable[i] = 1;
+			s_cfg->Usb3HsioTxRate2UniqTran[i] =
+				config->usb3_ports[i].tx_rate2_uniq_tran;
+		}
+		if (config->usb3_ports[i].ctrl_adapt_offset_cfg_enable) {
+			s_cfg->PchUsb3HsioCtrlAdaptOffsetCfgEnable[i] = 1;
+			s_cfg->PchUsb3HsioCtrlAdaptOffsetCfg[i] =
+				config->usb3_ports[i].ctrl_adapt_offset_cfg;
+		}
+		if (config->usb3_ports[i].olfps_cfg_pull_up_dwn_res) {
+			s_cfg->PchUsb3HsioOlfpsCfgPullUpDwnResEnable[i] = 1;
+			s_cfg->PchUsb3HsioOlfpsCfgPullUpDwnRes[i] =
+				config->usb3_ports[i].olfps_cfg_pull_up_dwn_res;
+		}
+		if (config->usb3_ports[i].filter_sel_n) {
+			s_cfg->PchUsb3HsioFilterSelNEnable[i] = 1;
+			s_cfg->PchUsb3HsioFilterSelN[i] =
+				config->usb3_ports[i].filter_sel_n;
+		}
+		if (config->usb3_ports[i].filter_sel_p) {
+			s_cfg->PchUsb3HsioFilterSelPEnable[i] = 1;
+			s_cfg->PchUsb3HsioFilterSelP[i] =
+				config->usb3_ports[i].filter_sel_p;
 		}
 	}
 
@@ -923,7 +952,7 @@ static void fill_fsps_pcie_params(FSP_S_CONFIG *s_cfg,
 		s_cfg->PcieRpClkReqDetect[i] = !!(rp_cfg->flags & PCIE_RP_CLK_REQ_DETECT);
 		/* PcieRpSlotImplemented default to 1 (slot implemented) in FSP; 0: built-in */
 		if (!!(rp_cfg->flags & PCIE_RP_BUILT_IN))
-			s_cfg->PcieRpSlotImplemented[i] = 0;
+			s_cfg->PcieRpSlotImplemented[i] = false;
 		s_cfg->PcieRpDetectTimeoutMs[i] = rp_cfg->pcie_rp_detect_timeout_ms;
 		configure_pch_rp_power_management(s_cfg, rp_cfg, i);
 	}
@@ -1245,6 +1274,9 @@ static void soc_silicon_init_params(FSP_S_CONFIG *s_cfg,
 	/* Override settings per board if required. */
 	mainboard_update_soc_chip_config(config);
 
+	/* Runtime configuration of S0ix */
+	config->s0ix_enable = get_uint_option("s0ix_enable", config->s0ix_enable);
+
 	void (*const fill_fsps_params[])(FSP_S_CONFIG *s_cfg,
 			const struct soc_intel_alderlake_config *config) = {
 		fill_fsps_lpss_params,
@@ -1374,12 +1406,27 @@ __weak void mainboard_silicon_init_params(FSP_S_CONFIG *s_cfg)
 }
 
 /* Handle FSP logo params */
-void soc_load_logo(FSPS_UPD *supd)
+void soc_load_logo_by_fsp(FSPS_UPD *supd)
 {
-	fsp_convert_bmp_to_gop_blt(&supd->FspsConfig.LogoPtr,
+	struct soc_intel_common_config *config = chip_get_common_soc_structure();
+	FSP_S_CONFIG *s_cfg = &supd->FspsConfig;
+
+	/*
+	 * Adjusts panel orientation for external display when the lid is closed.
+	 *
+	 * When the lid is closed (LidStatus == 0), indicating the onboard display is inactive,
+	 * this function forces the panel orientation to normal. This ensures proper display
+	 * on an external monitor, as rotated orientations are typically not suitable in
+	 * such state.
+	 */
+	if (s_cfg->LidStatus == 0)
+		config->panel_orientation = LB_FB_ORIENTATION_NORMAL;
+
+	fsp_load_and_convert_bmp_to_gop_blt(&supd->FspsConfig.LogoPtr,
 			 &supd->FspsConfig.LogoSize,
 			 &supd->FspsConfig.BltBufferAddress,
 			 &supd->FspsConfig.BltBufferSize,
 			 &supd->FspsConfig.LogoPixelHeight,
-			 &supd->FspsConfig.LogoPixelWidth);
+			 &supd->FspsConfig.LogoPixelWidth,
+			 config->panel_orientation);
 }

@@ -2,10 +2,11 @@
 
 config BOARD_AMD_CRATER_COMMON
 	def_bool n
-	select BOARD_ROMSIZE_KB_16384	# Birman actually has a 32MiB ROM
+	select BOARD_ROMSIZE_KB_32768
 	select EC_ACPI
 	select SOC_AMD_COMMON_BLOCK_USE_ESPI if !SOC_AMD_COMMON_BLOCK_SIMNOW_BUILD
 	select DRIVERS_PCIE_RTD3_DEVICE
+	select DRIVERS_I2C_HID
 	select MAINBOARD_HAS_CHROMEOS
 	select HAVE_ACPI_RESUME
 	select PCIEXP_ASPM
@@ -40,14 +41,6 @@ config DEVICETREE
 config CRATER_HAVE_MCHP_FW
 	bool "Have Microchip EC firmware?"
 	default n
-
-config CRATER_MCHP_SIG_FILE
-	string "Microchip EC signature file"
-	depends on CRATER_HAVE_MCHP_FW
-	help
-	  The EC sig blob is the first 4kBytes of the firmware image.
-	  The first 4 bytes form a pointer (with CRC) to where the EC firmware
-	  is located
 
 config AMD_SOC_CONSOLE_UART
 	default y if !SOC_AMD_COMMON_BLOCK_SIMNOW_BUILD
@@ -97,6 +90,23 @@ config ENABLE_EVAL_19V
 	depends on ENABLE_EVAL_CARD
 	help
 	  Enable the 19V rail for Eval Card PCIe slot
+
+choice
+	prompt "XGBE/WWAN/WLAN/DT Selection"
+	default XGBE_WWAN_WLAN
+	help
+	  Select the configuration for GPP[0:3] lanes
+
+config XGBE_WWAN_WLAN
+	bool "XGBE_WWAN_WLAN"
+	help
+	  Use GPP[0:1] for XGBE (ETH_AIC_SLOT), GPP[2] for WWAN slot and GPP[3] for WLAN slot.
+
+config ETH_AIC_SLOT_ONLY
+	bool "DT Enablement"
+	help
+	  Use GPP[0:3] for as PCIE (ETH_AIC_SLOT) only
+endchoice
 
 if !EM100	# EM100 defaults in soc/amd/common/blocks/spi/Kconfig
 config EFS_SPI_READ_MODE
