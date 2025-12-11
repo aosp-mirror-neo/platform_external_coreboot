@@ -50,6 +50,7 @@ cc_defaults {
 
         "-Wno-sign-compare",
         "-Wno-cast-qual",
+        "-Wno-sometimes-uninitialized",
 
         /* TODO(b/436814456): Remove these warning options once clang supports __nonstring__ */
         "-Wno-error=unknown-attributes",
