@@ -75,7 +75,7 @@ cc_defaults {
     name: "coreboot-tools-with-vboot-defaults",
     defaults: ["coreboot-tools-defaults"],
     include_dirs: ["external/vboot_reference/host/lib/include"],
-    static_libs: ["libvboot_host"],
+    shared_libs: ["libvboot_host"],
 }
 
 genrule {
@@ -187,9 +187,9 @@ cc_binary {
     vendor: true,
     srcs: [
         "util/cbmem/cbmem.c",
-	"util/cbmem/cbmem_drv.c",
-	"util/cbmem/devmem_drv.c",
-	"util/cbmem/sysfs_drv.c",
+        "util/cbmem/cbmem_drv.c",
+        "util/cbmem/devmem_drv.c",
+        "util/cbmem/sysfs_drv.c",
         "src/commonlib/bsd/ipchksum.c",
     ],
 }
