@@ -1,17 +1,22 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 
 #include <option.h>
+#include <drivers/intel/gma/opregion.h>
 #include <soc/ramstage.h>
+#include <common/pin_mux.h>
 
 void mainboard_silicon_init_params(FSP_S_CONFIG *supd)
 {
-	/*
-	 * FSP defaults to pins that are used for LPC; given that
-	 * coreboot only supports eSPI, set these pins accordingly.
-	 */
-	supd->PchSerialIoI2cSdaPinMux[0]	= 0x1947c404;	// GPP_H4
-	supd->PchSerialIoI2cSclPinMux[0]	= 0x1947a405;	// GPP_H5
+	configure_pin_mux(supd);
 
 	if (get_uint_option("thunderbolt", 1) == 0)
 		supd->UsbTcPortEn = 0;
+}
+
+const char *mainboard_vbt_filename(void)
+{
+	if (get_uint_option("display_native_res", 0) == 1)
+		return "vbt_native_res.bin";
+
+	return "vbt.bin";
 }

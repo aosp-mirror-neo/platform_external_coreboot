@@ -10,6 +10,27 @@
 #include <string.h>
 #include <types.h>
 
+/* Global override table registered by mainboard */
+static const struct cfr_default_override *mb_overrides = NULL;
+
+void cfr_register_overrides(const struct cfr_default_override *overrides)
+{
+	mb_overrides = overrides;
+}
+
+/* Look up override for a given option name */
+static const struct cfr_default_override *find_override(const char *opt_name)
+{
+	if (!mb_overrides || !opt_name)
+		return NULL;
+
+	for (const struct cfr_default_override *ovr = mb_overrides; ovr->opt_name; ovr++) {
+		if (strcmp(ovr->opt_name, opt_name) == 0)
+			return ovr;
+	}
+	return NULL;
+}
+
 static uint32_t cfr_record_size(const char *startp, const char *endp)
 {
 	const uintptr_t start = (uintptr_t)startp;
@@ -111,6 +132,17 @@ static uint32_t write_numeric_option(char *current, uint32_t tag, const uint64_t
 	struct lb_cfr_numeric_option *option = (struct lb_cfr_numeric_option *)current;
 	size_t len;
 
+	/* Check for mainboard override of default value */
+	const struct cfr_default_override *ovr = find_override(opt_name);
+	if (ovr) {
+		if (ovr->kind != tag)
+			printk(BIOS_WARNING, "CFR: override for option '%s' has mismatched type; skipping.\n", opt_name);
+		else if (tag == CFR_TAG_OPTION_BOOL)
+			default_value = ovr->bool_value;
+		else
+			default_value = ovr->uint_value;
+	}
+
 	option->tag = tag;
 	option->object_id = object_id;
 	option->dependency_id = dep_id;
@@ -187,6 +219,16 @@ static uint32_t sm_write_opt_varchar(char *current, const struct sm_obj_varchar 
 {
 	struct lb_cfr_varchar_option *option = (struct lb_cfr_varchar_option *)current;
 	size_t len;
+	const char *default_value = sm_varchar->default_value;
+
+	/* Check for mainboard override of default value */
+	const struct cfr_default_override *ovr = find_override(sm_varchar->opt_name);
+	if (ovr) {
+		if (ovr->kind == SM_OBJ_VARCHAR)
+			default_value = ovr->str_value;
+		else
+			printk(BIOS_WARNING, "CFR: override for option '%s' has mismatched type (not varchar); skipping.\n", sm_varchar->opt_name);
+	}
 
 	option->tag = CFR_TAG_OPTION_VARCHAR;
 	option->object_id = object_id;
@@ -197,7 +239,7 @@ static uint32_t sm_write_opt_varchar(char *current, const struct sm_obj_varchar 
 	option->size = sizeof(*option);
 
 	current += option->size;
-	current += sm_write_string_default_value(current, sm_varchar->default_value);
+	current += sm_write_string_default_value(current, default_value);
 	len = sm_write_opt_name(current, sm_varchar->opt_name);
 	if (!len)
 		return 0;
@@ -284,8 +326,8 @@ static uint32_t sm_write_object(char *current, const struct sm_object *sm_obj)
 	uint64_t dep_id, obj_id;
 	const uint32_t *dep_values;
 	uint32_t num_dep_values;
-	struct sm_object sm_obj_copy;
 	assert(sm_obj);
+	struct sm_object sm_obj_copy = *sm_obj;
 
 	/* Assign uniqueue ID */
 	obj_id = sm_gen_obj_id((void *)sm_obj);
@@ -304,37 +346,34 @@ static uint32_t sm_write_object(char *current, const struct sm_object *sm_obj)
 
 	/* Invoke callback to update fields */
 	if (sm_obj->ctor) {
-		memcpy(&sm_obj_copy, sm_obj, sizeof(*sm_obj));
-		sm_obj->ctor(sm_obj, &sm_obj_copy);
-
+		sm_obj->ctor(&sm_obj_copy);
 		assert(sm_obj->kind == sm_obj_copy.kind);
-		sm_obj = (const struct sm_object *)&sm_obj_copy;
 	}
 
-	switch (sm_obj->kind) {
+	switch (sm_obj_copy.kind) {
 	case SM_OBJ_NONE:
 		return 0;
 	case SM_OBJ_ENUM:
-		return sm_write_opt_enum(current, &sm_obj->sm_enum, obj_id,
+		return sm_write_opt_enum(current, &sm_obj_copy.sm_enum, obj_id,
 					 dep_id, dep_values, num_dep_values);
 	case SM_OBJ_NUMBER:
-		return sm_write_opt_number(current, &sm_obj->sm_number, obj_id,
+		return sm_write_opt_number(current, &sm_obj_copy.sm_number, obj_id,
 					   dep_id, dep_values, num_dep_values);
 	case SM_OBJ_BOOL:
-		return sm_write_opt_bool(current, &sm_obj->sm_bool, obj_id,
+		return sm_write_opt_bool(current, &sm_obj_copy.sm_bool, obj_id,
 					 dep_id, dep_values, num_dep_values);
 	case SM_OBJ_VARCHAR:
-		return sm_write_opt_varchar(current, &sm_obj->sm_varchar, obj_id,
+		return sm_write_opt_varchar(current, &sm_obj_copy.sm_varchar, obj_id,
 					    dep_id, dep_values, num_dep_values);
 	case SM_OBJ_COMMENT:
-		return sm_write_opt_comment(current, &sm_obj->sm_comment, obj_id,
+		return sm_write_opt_comment(current, &sm_obj_copy.sm_comment, obj_id,
 					    dep_id, dep_values, num_dep_values);
 	case SM_OBJ_FORM:
-		return sm_write_form(current, (struct sm_obj_form *)&sm_obj->sm_form, obj_id,
+		return sm_write_form(current, (struct sm_obj_form *)&sm_obj_copy.sm_form, obj_id,
 				     dep_id, dep_values, num_dep_values);
 	default:
 		BUG();
-		printk(BIOS_ERR, "Unknown setup menu object kind %u, ignoring\n", sm_obj->kind);
+		printk(BIOS_ERR, "Unknown setup menu object kind %u, ignoring\n", sm_obj_copy.kind);
 		return 0;
 	}
 }

@@ -71,7 +71,8 @@ ramstage-y += ../common/rtc.c ../common/rtc_pwrap_ops.c rtc.c
 ramstage-y += ../common/usb.c usb.c
 
 ramstage-y += ../common/ddp.c ddp.c
-ramstage-y += ../common/dsi.c dsi.c
+ramstage-y += ../common/dsi_common.c dsi.c
+ramstage-y += ../common/mtk_mipi_dphy_v1.c
 
 BL31_MAKEARGS += PLAT=mt8173
 

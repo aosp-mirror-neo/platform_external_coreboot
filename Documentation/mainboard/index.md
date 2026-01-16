@@ -43,6 +43,7 @@ IMB-1222 <asrock/imb-1222.md>
 
 A88XM-E <asus/a88xm-e.md>
 F2A85-M <asus/f2a85-m.md>
+H610i-PLUS D4 <asus/h610i-plus-d4>
 P2B-LS <asus/p2b-ls.md>
 P3B-F <asus/p3b-f.md>
 P5Q <asus/p5q.md>
@@ -247,7 +248,7 @@ T440p <lenovo/t440p.md>
 ```{toctree}
 :maxdepth: 1
 
-T480/T480s <lenovo/t480.md>
+T470s/T480/T480s/T580/X280 <lenovo/skylake.md>
 ```
 ## Libretrend
 

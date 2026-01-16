@@ -22,6 +22,18 @@ static const struct sm_object hyper_threading = SM_DECLARE_ENUM({
 				SM_ENUM_VALUE_END		},
 });
 
+/* IGD Enabled */
+static const struct sm_object igd_enabled = SM_DECLARE_ENUM({
+	.opt_name	= "igd_enabled",
+	.ui_name	= "Enable the Intel iGPU",
+	.ui_helptext	= "Enable or disable the Intel iGPU",
+	.default_value	= !CONFIG(SOC_INTEL_DISABLE_IGD),
+	.values		= (const struct sm_enum_value[]) {
+				{ "Disabled",		0	},
+				{ "Enabled",		1	},
+				SM_ENUM_VALUE_END		},
+});
+
 /* IGD Aperture Size */
 static const struct sm_object igd_aperture = SM_DECLARE_ENUM({
 	.opt_name	= "igd_aperture_size",
@@ -39,7 +51,7 @@ static const struct sm_object igd_aperture = SM_DECLARE_ENUM({
 				{ " 512 MB",		IGD_AP_SZ_512MB		},
 #endif
 				SM_ENUM_VALUE_END				},
-});
+}, WITH_DEP_VALUES(&igd_enabled, 1));
 
 /* IGD DVMT pre-allocated memory */
 static const struct sm_object igd_dvmt = SM_DECLARE_ENUM({
@@ -55,7 +67,7 @@ static const struct sm_object igd_dvmt = SM_DECLARE_ENUM({
 				{ "128 MB",		IGD_SM_128MB	},
 				{ "160 MB",		IGD_SM_160MB	},
 				SM_ENUM_VALUE_END			},
-});
+}, WITH_DEP_VALUES(&igd_enabled, 1));
 
 /* Legacy 8254 Timer */
 static const struct sm_object legacy_8254_timer = SM_DECLARE_ENUM({
@@ -73,7 +85,7 @@ static const struct sm_object legacy_8254_timer = SM_DECLARE_ENUM({
 static const struct sm_object s0ix_enable = SM_DECLARE_ENUM({
 	.opt_name	= "s0ix_enable",
 	.ui_name	= "Modern Standby (S0ix)",
-	.ui_helptext	= "Enabled: use Modern Standby / S0ix. Disabled: use APCI S3 sleep",
+	.ui_helptext	= "Enabled: use Modern Standby / S0ix. Disabled: use ACPI S3 sleep",
 	.default_value	= 1,
 	.values		= (const struct sm_enum_value[]) {
 				{ "Disabled",		0	},

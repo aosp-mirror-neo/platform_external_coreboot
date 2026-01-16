@@ -7,8 +7,8 @@
 #include <fw_config.h>
 
 static const struct pad_config fp_disable_pads[] = {
-	/* GPP_D8 : PCH_FP_BOOT0 */
-	PAD_NC(GPP_D8, NONE),
+	/* GPP_D5 : PCH_FP_BOOT0 */
+	PAD_NC(GPP_D5, NONE),
 	/* GPP_D9 : FP_RST_ODL */
 	PAD_NC(GPP_D9, NONE),
 	/* GPP_D11 : [] ==> EN_FP_PWR */
@@ -49,8 +49,8 @@ static const struct pad_config lte_disable_pads[] = {
 static const struct pad_config nvme_disable_pads[] = {
 	/* GPP_F9 : SSD_PERST_L */
 	PAD_NC(GPP_F9, NONE),
-	/* GPP_D5 : SSD_CLKREQ_ODL */
-	PAD_NC(GPP_D5, NONE),
+	/* GPP_D8 : SSD_CLKREQ_ODL */
+	PAD_NC(GPP_D8, NONE),
 };
 
 static void fw_config_handle(void *unused)

@@ -212,7 +212,7 @@ static const struct slot_irq_constraints irq_constraints[] = {
 			ANY_PIRQ(PCI_DEVFN_CSE_4),
 		},
 	},
-#if (CONFIG(SOC_INTEL_PANTHERLAKE_U_H) || CONFIG(SOC_INTEL_WILDCATLAKE))
+#if (CONFIG(SOC_INTEL_WILDCATLAKE))
 	{
 		.slot = PCI_DEV_SLOT_UFS,
 		.fns = {
@@ -289,6 +289,8 @@ static void fill_fsps_lpss_params(FSP_S_CONFIG *s_cfg,
 			config->serial_io_uart_mode[i] : 0;
 		s_cfg->SerialIoUartPowerGating[i] = is_devfn_enabled(uart_dev[i]) ?
 			LPSS_UART_PG_ENABLED : LPSS_UART_PG_AUTO;
+		s_cfg->SerialIoUartDmaEnable[i] = is_devfn_enabled(uart_dev[i]) ?
+			config->serial_io_uart_dma_enable[i] : 0;
 	}
 }
 
@@ -730,6 +732,7 @@ static void fill_fsps_audio_params(FSP_S_CONFIG *s_cfg,
 	s_cfg->PchHdaMicPrivacyHwModeSoundWire3 = 1;
 	s_cfg->PchHdaMicPrivacyHwModeSoundWire4 = 1;
 	s_cfg->PchHdaMicPrivacyHwModeDmic = 1;
+	s_cfg->PchHdaMicPrivacyMode = 1;
 }
 
 static void fill_fsps_iax_params(FSP_S_CONFIG *s_cfg,
@@ -741,7 +744,7 @@ static void fill_fsps_iax_params(FSP_S_CONFIG *s_cfg,
 static void fill_fsps_ufs_params(FSP_S_CONFIG *s_cfg,
 		const struct soc_intel_pantherlake_config *config)
 {
-#if (CONFIG(SOC_INTEL_PANTHERLAKE_U_H) || CONFIG(SOC_INTEL_WILDCATLAKE))
+#if CONFIG(SOC_INTEL_WILDCATLAKE)
 	/* Setting FSP UPD (1,0) to enable controller 0 */
 	s_cfg->UfsEnable[0] = is_devfn_enabled(PCI_DEVFN_UFS);
 	s_cfg->UfsEnable[1] = 0;

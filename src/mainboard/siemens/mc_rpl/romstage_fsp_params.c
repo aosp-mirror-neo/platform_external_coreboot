@@ -1,12 +1,12 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 
+#include <baseboard/variants.h>
 #include <console/console.h>
 #include <fsp/api.h>
 #include <hwilib.h>
+#include <soc/meminit.h>
 #include <soc/romstage.h>
 #include <spd_bin.h>
-#include <soc/meminit.h>
-#include <baseboard/variants.h>
 
 /*
  * ADL-P silicon can support 7 SRC CLK's and 10 CLKREQ signals. Out of 7 SRCCLK's
@@ -61,4 +61,6 @@ void mainboard_memory_init_params(FSPM_UPD *memupd)
 
 	if (CONFIG(GEN3_EXTERNAL_CLOCK_BUFFER))
 		configure_external_clksrc(m_cfg);
+
+	variant_configure_fspm(memupd);
 }

@@ -80,6 +80,20 @@ int google_chromeec_set_sku_id(uint32_t skuid);
 uint64_t  google_chromeec_get_events_b(void);
 int google_chromeec_clear_events_b(uint64_t mask);
 int google_chromeec_kbbacklight(int percent);
+bool google_chromeec_has_kbbacklight(void);
+enum google_chromeec_rgbkbd_color {
+	GOOGLE_CHROMEEC_RGBKBD_COLOR_UNSET = -1,
+	GOOGLE_CHROMEEC_RGBKBD_COLOR_OFF = 0,
+	GOOGLE_CHROMEEC_RGBKBD_COLOR_RED,
+	GOOGLE_CHROMEEC_RGBKBD_COLOR_GREEN,
+	GOOGLE_CHROMEEC_RGBKBD_COLOR_BLUE,
+	GOOGLE_CHROMEEC_RGBKBD_COLOR_YELLOW,
+	GOOGLE_CHROMEEC_RGBKBD_COLOR_WHITE,
+	GOOGLE_CHROMEEC_RGBKBD_COLOR_COUNT,
+};
+int google_chromeec_rgbkbd_set_color(enum google_chromeec_rgbkbd_color color);
+bool google_chromeec_has_rgbkbd(void);
+bool google_chromeec_has_fan(void);
 void google_chromeec_post(uint8_t postcode);
 uint8_t google_chromeec_get_switches(void);
 bool google_chromeec_get_ap_watchdog_flag(void);
@@ -93,6 +107,8 @@ int google_chromeec_vstore_write(int slot, uint8_t *data, size_t size);
 /* Issue reboot command to EC with specified type and flags. Returns 0 on
    success, < 0 otherwise. */
 int google_chromeec_reboot(enum ec_reboot_cmd type, uint8_t flags);
+
+void google_chromeec_ap_poweroff(void);
 
 /**
  * Get data from Cros Board Info
@@ -521,5 +537,13 @@ bool chipset_emi_write_bytes(u16 port, size_t length, u8 *msg, u8 *csum);
  * @param size		Pointer to the size of the IO port range
  */
 void chipset_ioport_range(uint16_t *base, size_t *size);
+
+/*
+ * Reads the current battery charge percentage.
+ *
+ * @param state		Pointer to a uint32_t where the battery state of charge (0-100) will be
+ *			stored.
+ */
+int google_chromeec_read_batt_state_of_charge(uint32_t *state);
 
 #endif /* _EC_GOOGLE_CHROMEEC_EC_H */

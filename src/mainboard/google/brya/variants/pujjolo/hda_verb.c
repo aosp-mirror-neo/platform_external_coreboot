@@ -6,35 +6,44 @@ const u32 cim_verb_data[] = {
 	/* coreboot specific header */
 	0x10ec0257,	// Codec Vendor / Device ID: Realtek ALC257
 	0x10ec0257,	// Subsystem ID
-	0x00000011,	// Number of jacks (NID entries)
+	0x00000013,	// Number of jacks (NID entries)
 
-	AZALIA_RESET(0x1),
-	/* NID 0x01, HDA Codec Subsystem ID Verb table */
-	//AZALIA_SUBVENDOR(0, 0x10ec3a2c),
+	/* HDA Codec Subsystem ID Verb table */
+	AZALIA_SUBVENDOR(0, 0x00000000),
 
 	/* Pin Widget Verb Table */
-	/*
-	 * DMIC
-	 * Requirement is to use PCH DMIC. Hence,
-	 * commented out codec's Internal DMIC.
-	 * AZALIA_PIN_CFG(0, 0x12, 0x90A60130),
-	 * AZALIA_PIN_CFG(0, 0x13, 0x40000000),
-	 */
-	 AZALIA_PIN_CFG(0, 0x12, 0x40000000),
-	 AZALIA_PIN_CFG(0, 0x13, 0x411111F0),
-	 AZALIA_PIN_CFG(0, 0x14, 0x90170110),
-	 AZALIA_PIN_CFG(0, 0x18, 0x411111f0),
-	 AZALIA_PIN_CFG(0, 0x19, 0x04A11030),
-	 AZALIA_PIN_CFG(0, 0x1a, 0x411111f0),
-	 AZALIA_PIN_CFG(0, 0x1b, 0x411111f0),
-	 AZALIA_PIN_CFG(0, 0x1d, 0x40579A2D),
-	 AZALIA_PIN_CFG(0, 0x1e, 0x411111F0),
-	 AZALIA_PIN_CFG(0, 0x21, 0x04211020),
+	/* Widget node 0x01 */
+	AZALIA_RESET(0x1),
+	/* Pin widget 0x12 - DMIC */
+	AZALIA_PIN_CFG(0, 0x12, 0x40000000),
+	/* Pin widget 0x13 - DMIC */
+	AZALIA_PIN_CFG(0, 0x13, 0x411111F0),
+	/* Pin widget 0x14 - FRONT (Port-D) */
+	AZALIA_PIN_CFG(0, 0x14, 0x90170110),
+	/* Pin widget 0x18 - NPC */
+	AZALIA_PIN_CFG(0, 0x18, 0x411111F0),
+	/* Pin widget 0x19 - MIC2 (Port-F) */
+	AZALIA_PIN_CFG(0, 0x19, 0x04A11030),
+	/* Pin widget 0x1A - LINE1 (Port-C) */
+	AZALIA_PIN_CFG(0, 0x1a, 0x411111F0),
+	/* Pin widget 0x1B - LINE2 (Port-E) */
+	AZALIA_PIN_CFG(0, 0x1b, 0x411111F0),
+	/* Pin widget 0x1D - BEEP-IN */
+	AZALIA_PIN_CFG(0, 0x1d, 0x40579A2D),
+	/* Pin widget 0x1E - S/PDIF-OUT */
+	AZALIA_PIN_CFG(0, 0x1e, 0x411111F0),
+	/* Pin widget 0x21 - HP-OUT (Port-I) */
+	AZALIA_PIN_CFG(0, 0x21, 0x04211020),
+
 	//==========Widget node 0x20 - 0 :Hidden register SW reset
 	0x0205001A,
 	0x0204C003,
 	0x0205001A,
 	0x0204C003,
+	0x05850000,
+	0x0584F880,
+	0x05850000,
+	0x0584F880,
 	//==========Widget node 0x20 - 1 : ClassD 2W
 	0x02050038,
 	0x02048981,
@@ -73,6 +82,11 @@ const u32 pc_beep_verbs[] = {
 	0x0143B000,
 	0x01470C02,
 	0x01470C02,
+	/* Dos beep path - 3 */
+	0x0205000C,
+	0x020401FF,
+	0x00170503,
+	0x00170503,
 };
 
 AZALIA_ARRAY_SIZES;

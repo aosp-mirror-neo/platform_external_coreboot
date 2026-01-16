@@ -5,7 +5,8 @@
 
 #include <stdint.h>
 
-struct FSP_UPD_HEADER {
+
+typedef struct {
 	///
 	/// UPD Region Signature. This signature will be
 	/// "XXXXXX_T" for FSP-T
@@ -19,10 +20,12 @@ struct FSP_UPD_HEADER {
 	///
 	uint8_t                       Revision;
 	uint8_t                       Reserved[23];
-} __packed;
+} __packed FSP_UPD_HEADER;
+
+_Static_assert(sizeof(FSP_UPD_HEADER) == 32, "FSP_UPD_HEADER not packed");
 
 #if CONFIG(PLATFORM_USES_FSP2_X86_32)
-struct FSPM_ARCH_UPD {
+typedef struct {
 	///
 	/// Revision of the structure. For FSP v2.0 value is 1.
 	///
@@ -53,13 +56,14 @@ struct FSPM_ARCH_UPD {
 	///
 	uint32_t                      BootMode;
 	uint8_t                       Reserved1[8];
-} __packed;
+} __packed FSPM_ARCH_UPD;
+
+_Static_assert(sizeof(FSPM_ARCH_UPD) == 32, "FSPM_ARCH_UPD not packed");
 #else
 #error You need to implement this struct for x86_64 FSP
 #endif
 
-#endif
-struct FSPS_ARCH_UPD {
+typedef struct {
 	///
 	/// Revision of the structure. For FSP v2.2 value is 1.
 	///
@@ -75,6 +79,8 @@ struct FSPS_ARCH_UPD {
 	///
 	uint8_t                       EnableMultiPhaseSiliconInit;
 	uint8_t                       Reserved2[19];
-} __packed;
+} __packed FSPS_ARCH_UPD;
+
+_Static_assert(sizeof(FSPS_ARCH_UPD) == 32, "FSPS_ARCH_UPD not packed");
 
 #endif /* _FSP2_0_UPD_H_ */

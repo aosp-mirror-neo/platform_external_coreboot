@@ -5,7 +5,6 @@
 #include <soc/meminit.h>
 #include <soc/romstage.h>
 
-#define BOARD_ID_MASK	0x3f
 #define SMBUS_ADDR_DIMM	0x50
 
 static const struct mb_cfg lp5_mem_config = {
@@ -39,8 +38,6 @@ static const struct mb_cfg lp5_mem_config = {
 
 	.ect = true, /* Early Command Training */
 
-	.lp_ddr_dq_dqs_re_training = 1,
-
 	.user_bd = BOARD_TYPE_ULT_ULX,
 
 	.lp5x_config = {
@@ -55,10 +52,12 @@ static const struct mb_cfg ddr5_mem_config = {
 
 	.user_bd = BOARD_TYPE_ULT_ULX,
 
-	.lp_ddr_dq_dqs_re_training = 1,
-
 	.ddr_config = {
 		.dq_pins_interleaved = false,
+	},
+
+	.rcomp = {
+		.resistor = 100,
 	},
 };
 
@@ -82,7 +81,6 @@ const struct mb_cfg *variant_memory_params(void)
 void variant_get_spd_info(struct mem_spd *spd_info)
 {
 	uint32_t id = board_id() & BOARD_ID_MASK;
-	spd_info->cbfs_index = 0;
 
 	switch (id) {
 	case BOARD_ID_DDR5:
@@ -91,6 +89,7 @@ void variant_get_spd_info(struct mem_spd *spd_info)
 		spd_info->smbus[1].addr_dimm[0] = SMBUS_ADDR_DIMM;
 		break;
 	case BOARD_ID_LP5X:
+		spd_info->cbfs_index = variant_memory_sku();
 		spd_info->topo = MEM_TOPO_MEMORY_DOWN;
 		break;
 	default:

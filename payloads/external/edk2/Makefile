@@ -122,11 +122,17 @@ endif
 ifeq ($(CONFIG_SOC_AMD_COMMON_BLOCK_PSP_GEN2), y)
 BUILD_STR += --pcd gPcAtChipsetPkgTokenSpaceGuid.PcdInitialValueRtcRegisterD=0x80
 endif
+# CAPSULE_SUPPORT		= FALSE
+# CAPSULE_MAIN_FW_GUID	=
+ifeq ($(CONFIG_DRIVERS_EFI_UPDATE_CAPSULES),y)
+BUILD_STR += -D CAPSULE_SUPPORT=TRUE
+BUILD_STR += -D CAPSULE_MAIN_FW_GUID=$(CONFIG_DRIVERS_EFI_MAIN_FW_GUID)
+endif
 
 #
-# The MrChromebox repository has the following addition options:
+# One or more downstream edk2 repositories support the following additional options:
 #
-ifeq ($(CONFIG_EDK2_REPO_MRCHROMEBOX),y)
+ifeq ($(CONFIG_EDK2_REPO_OFFICIAL),)
 
 # FOLLOW_BGRT_SPEC		= FALSE
 ifeq ($(CONFIG_EDK2_FOLLOW_BGRT_SPEC),y)
@@ -144,14 +150,6 @@ endif
 ifeq ($(CONFIG_EDK2_DISABLE_TPM),y)
 BUILD_STR += -D TPM_ENABLE=FALSE
 endif
-# UFS_ENABLE			= FALSE
-ifeq ($(CONFIG_EDK2_UFS_ENABLE),y)
-BUILD_STR += -D UFS_ENABLE=TRUE
-endif
-# USE_PCO_MMIO_EMMC		= FALSE
-ifeq ($(CONFIG_EDK2_PCO_MMIO_EMMC),y)
-BUILD_STR += -D USE_PCO_MMIO_EMMC=TRUE
-endif
 # TIMER_SUPPORT			= HPET
 ifeq ($(CONFIG_EDK2_USE_LAPIC_TIMER),y)
 BUILD_STR += -D TIMER_SUPPORT=LAPIC
@@ -160,8 +158,13 @@ endif
 ifeq ($(CONFIG_EDK2_LOAD_OPTION_ROMS),y)
 BUILD_STR += -D LOAD_OPTION_ROMS=TRUE
 endif
-
+# NETWORK_IPXE                  = FALSE
+ifeq ($(CONFIG_EDK2_IPXE),y)
+BUILD_STR += -D NETWORK_IPXE=TRUE
+BUILD_STR += --pcd gUefiPayloadPkgTokenSpaceGuid.PcdiPXEOptionName=L"$(CONFIG_EDK2_IPXE_OPTION_NAME)"
 endif
+
+endif # !CONFIG_EDK2_REPO_OFFICIAL
 
 #
 # EDKII has the below PCDs that are relevant to coreboot:
@@ -180,6 +183,11 @@ BUILD_STR += --pcd gEfiMdeModulePkgTokenSpaceGuid.PcdSetupConOutColumn=128
 endif
 
 BUILD_STR += --pcd gEfiMdeModulePkgTokenSpaceGuid.PcdAcpiDefaultOemId="COREv4"
+BUILD_STR += --pcd gUefiCpuPkgTokenSpaceGuid.PcdFirstTimeWakeUpAPsBySipi=FALSE
+
+# coreboot produces SMBIOS 3.0.0 tables
+BUILD_STR += --pcd gEfiMdeModulePkgTokenSpaceGuid.PcdSmbiosVersion=0x0300
+BUILD_STR += --pcd gEfiMdeModulePkgTokenSpaceGuid.PcdSmbiosDocRev=0x0
 
 bootloader = $(word 8,$(subst /, ,$(BUILD_STR)))
 
@@ -249,6 +257,14 @@ gop_driver: $(EDK2_PATH)
 		cp $(top)/$(CONFIG_INTEL_GMA_VBT_FILE) $(EDK2_PATH)/UefiPayloadPkg/vbt.bin; \
 	fi; \
 
+ipxe_rom: $(EDK2_PATH)
+	if [ "$(CONFIG_EDK2_IPXE)" == "y" ]; then \
+		echo "    Including externally built iPXE"; \
+		mkdir -p $(EDK2_PATH)/UefiPayloadPkg/NetworkDrivers/; \
+		cp $(top)/payloads/external/iPXE/ipxe/ipxe.rom \
+			$(EDK2_PATH)/UefiPayloadPkg/NetworkDrivers/ipxe.efi; \
+	fi \
+
 checktools:
 	echo -n "EDK2: Checking uuid-dev:"
 	echo "#include <uuid/uuid.h>" > libtest.c
@@ -276,7 +292,7 @@ print:
 	echo "   Branch:         $(CONFIG_EDK2_TAG_OR_REV)"
 	echo "   Packages path:  $(PACKAGES_PATH)"
 	echo " $(BUILD_STR)" | \
-		sed -e 's/--/-/g' -e 's/-/\n   /g' | sort | sed \
+		sed -e 's/ --/ -/g' -e 's/ -/ \n   /g' | sort | sed \
 		-e 's/a /Architecture:   /g' \
 		-e 's/b /Release:        /g' \
 		-e 's/D /Option:         /g' \
@@ -286,7 +302,7 @@ print:
 		-e 's/s /Build:          Silent/' \
 		-e 's/t /Toolchain:      /'
 
-prep: $(EDK2_PATH) $(EDK2_PLATFORMS_PATH) clean checktools logo gop_driver
+prep: $(EDK2_PATH) $(EDK2_PLATFORMS_PATH) clean checktools logo gop_driver ipxe_rom
 	cd $(WORKSPACE); \
 		source $(EDK2_PATH)/edksetup.sh; \
 		unset CC; $(MAKE) -C $(EDK2_PATH)/BaseTools 2>&1; \

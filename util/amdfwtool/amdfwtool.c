@@ -255,7 +255,6 @@ amd_fw_entry amd_psp_fw_table[] = {
 	{ .type = AMD_FW_AMF_WLAN, .inst = 2, .level = PSP_LVL2 | PSP_LVL2_AB },
 	{ .type = AMD_FW_AMF_WLAN, .inst = 3, .level = PSP_LVL2 | PSP_LVL2_AB },
 	{ .type = AMD_FW_AMF_MFD, .level = PSP_LVL2 | PSP_LVL2_AB },
-	{ .type = AMD_TA_IKEK, .level = PSP_BOTH | PSP_LVL2_AB, .skip_hashing = true },
 	{ .type = AMD_FW_MPCCX, .subprog = 0, .level = PSP_LVL2 | PSP_LVL2_AB },
 	{ .type = AMD_FW_MPCCX, .subprog = 1, .level = PSP_LVL2 | PSP_LVL2_AB },
 	{ .type = AMD_FW_LSDMA, .level = PSP_LVL2 | PSP_LVL2_AB },
@@ -267,7 +266,6 @@ amd_fw_entry amd_psp_fw_table[] = {
 	{ .type = AMD_FW_GFXIMU_0, .subprog = 1, .level = PSP_BOTH | PSP_LVL2_AB },
 	{ .type = AMD_FW_GFXIMU_1, .subprog = 0, .level = PSP_BOTH | PSP_LVL2_AB },
 	{ .type = AMD_FW_GFXIMU_1, .subprog = 1, .level = PSP_BOTH | PSP_LVL2_AB },
-	{ .type = AMD_FW_GFXIMU_2, .level = PSP_BOTH | PSP_LVL2_AB },
 	{ .type = AMD_FW_SRAM_FW_EXT, .level = PSP_LVL2 | PSP_LVL2_AB },
 	{ .type = AMD_FW_UMSMU, .level = PSP_LVL2 | PSP_LVL2_AB },
 	{ .type = AMD_FW_S3IMG, .level = PSP_LVL2 | PSP_LVL2_AB },
@@ -967,11 +965,6 @@ static void integrate_psp_levels(context *ctx,
 	current_table_save = ctx->current_table;
 	ctx->current_table = BUFF_TO_RUN_MODE(*ctx, pspdir, AMD_ADDR_REL_BIOS);
 	if (recovery_ab && (pspdir2 != NULL)) {
-		if (cb_config->need_ish) {	/* Need ISH */
-			ctx->ish_a_dir = new_ish_dir(ctx);
-			if (pspdir2_b != NULL)
-				ctx->ish_b_dir = new_ish_dir(ctx);
-		}
 		integrate_psp_ab(ctx, pspdir, pspdir2, ctx->ish_a_dir,
 			AMD_FW_RECOVERYAB_A, cb_config->soc_id);
 		if (pspdir2_b != NULL)
@@ -1012,7 +1005,7 @@ static void integrate_psp_firmwares(context *ctx,
 	unsigned int i, count;
 	int level;
 	uint32_t size;
-	psp_directory_table *pspdir;
+	psp_directory_table *pspdir = NULL;
 	uint64_t addr;
 	uint32_t current_table_save;
 	bool recovery_ab = cb_config->recovery_ab;
@@ -1023,17 +1016,31 @@ static void integrate_psp_firmwares(context *ctx,
 	 * is passed, clearly a 2nd-level table is intended.  However, a
 	 * 1st-level cookie may indicate level 1 or flattened.
 	 */
-	pspdir = new_psp_dir(ctx, cb_config->multi_level, cookie);
+	current_table_save = ctx->current_table;
 
 	if (cookie == PSP_COOKIE) {
-		ctx->pspdir = pspdir;
-		if (recovery_ab)
-			ctx->pspdir_bak = new_psp_dir(ctx, cb_config->multi_level, cookie);
+		if (!cb_config->combo_new_rab || ctx->combo_index == 0) {
+			pspdir = new_psp_dir(ctx, cb_config->multi_level, cookie);
+			ctx->pspdir = pspdir;
+			if (recovery_ab)
+				ctx->pspdir_bak = new_psp_dir(ctx, cb_config->multi_level, cookie);
+		}
+		/* The ISH tables are with PSP L1. */
+		if (cb_config->need_ish && ctx->ish_a_dir == NULL)	/* Need ISH */
+			ctx->ish_a_dir = new_ish_dir(ctx);
+		if (cb_config->need_ish && ctx->ish_b_dir == NULL)	/* Need ISH */
+			ctx->ish_b_dir = new_ish_dir(ctx);
 	} else if (cookie == PSPL2_COOKIE) {
-		if (ctx->pspdir2 == NULL)
+		if (ctx->pspdir2 == NULL) {
+			pspdir = new_psp_dir(ctx, cb_config->multi_level, cookie);
 			ctx->pspdir2 = pspdir;
-		else if (ctx->pspdir2_b == NULL)
+		} else if (ctx->pspdir2_b == NULL) {
+			pspdir = new_psp_dir(ctx, cb_config->multi_level, cookie);
 			ctx->pspdir2_b = pspdir;
+		}
+	}
+	if (pspdir == NULL) {
+		goto out;
 	}
 
 	if (!cb_config->multi_level)
@@ -1053,7 +1060,7 @@ static void integrate_psp_firmwares(context *ctx,
 		else
 			level = PSP_BOTH_AB;
 	}
-	current_table_save = ctx->current_table;
+
 	ctx->current_table = BUFF_TO_RUN_MODE(*ctx, pspdir, AMD_ADDR_REL_BIOS);
 	adjust_current_pointer(ctx, 0, TABLE_ALIGNMENT);
 
@@ -1153,6 +1160,7 @@ static void integrate_psp_firmwares(context *ctx,
 	}
 
 	fill_dir_header(pspdir, count, ctx);
+out:
 	ctx->current_table = current_table_save;
 }
 
@@ -1677,11 +1685,6 @@ static bool is_initial_alignment_required(enum platform soc_id)
 	}
 }
 
-static bool needs_new_combo_layout(enum platform soc_id)
-{
-	return needs_ish(soc_id);
-}
-
 int main(int argc, char **argv)
 {
 	int retval = 0;
@@ -1708,9 +1711,6 @@ int main(int argc, char **argv)
 	}
 
 	open_process_config(cb_config.config, &cb_config);
-
-	if (cb_config.use_combo && needs_new_combo_layout(cb_config.soc_id))
-		cb_config.combo_new_rab = true;
 
 	ctx.rom = malloc(ctx.rom_size);
 	if (!ctx.rom) {
@@ -1824,8 +1824,7 @@ int main(int argc, char **argv)
 
 		if (cb_config.multi_level) {
 			/* PSP L1 */
-			if (!cb_config.combo_new_rab || ctx.combo_index == 0)
-				integrate_psp_firmwares(&ctx,
+			integrate_psp_firmwares(&ctx,
 					amd_psp_fw_table, PSP_COOKIE, &cb_config);
 			/* PSP L2 & BIOS L2 (if AB recovery) */
 			integrate_psp_firmwares(&ctx,

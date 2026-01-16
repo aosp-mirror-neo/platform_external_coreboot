@@ -34,8 +34,8 @@
 
 /* Maximum number of memory range definitions. */
 #define SYSINFO_MAX_MEM_RANGES 32
-/* Allow a maximum of 8 GPIOs */
-#define SYSINFO_MAX_GPIOS 8
+/* Allow a maximum of 10 GPIOs */
+#define SYSINFO_MAX_GPIOS 10
 
 /* Up to 10 MAC addresses */
 #define SYSINFO_MAX_MACS 10
@@ -44,6 +44,10 @@
 #define SYSINFO_MAX_MMAP_WINDOWS 2
 
 #include <coreboot_tables.h>
+
+#if CONFIG(LP_GPL)
+#include <commonlib/memory_info.h>
+#endif
 
 /*
  * This is a collection of information and pointers gathered
@@ -173,6 +177,9 @@ struct sysinfo_t {
 	/* pvmfw buffer location */
 	uintptr_t pvmfw;
 	uint32_t pvmfw_size;
+	enum boot_mode_t boot_mode;
+
+	uintptr_t memory_info;
 };
 
 extern struct sysinfo_t lib_sysinfo;

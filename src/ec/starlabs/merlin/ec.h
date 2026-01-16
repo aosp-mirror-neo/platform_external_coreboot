@@ -47,10 +47,6 @@
 #define ITE_CHIPID2		0x21	/* Device ID register 2 */
 #define NUVOTON_CHIPID		0x27	/* Device ID register */
 
-/* EC RAM common offsets */
-#define ECRAM_MAJOR_VERSION	0x00
-#define ECRAM_MINOR_VERSION	0x01
-
 /*
  * CMOS Settings
  */
@@ -105,12 +101,14 @@
 #define SPEED_0_2C		0x02
 
 /* Lid Switch */
-#define SWITCH_ENABLED		0x00
-#define SWITCH_DISABLED		0x01
+#define SWITCH_NORMAL		0x00
+#define SWITCH_SLEEP_ONLY	0x01
+#define SWITCH_DISABLED		0x02
 
 /* Power LED Brightness */
 #define LED_NORMAL		0x00
 #define LED_REDUCED		0x01
+#define LED_OFF			0x02
 
 uint16_t ec_get_version(void);
 

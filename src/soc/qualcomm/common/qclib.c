@@ -9,6 +9,7 @@
 #include <console/console.h>
 #include <fmap.h>
 #include <mrc_cache.h>
+#include <option.h>
 #include <reset.h>
 #include <security/vboot/misc.h>
 #include <soc/mmu.h>
@@ -16,6 +17,7 @@
 #include <soc/qclib_common.h>
 #include <soc/symbols_common.h>
 #include <string.h>
+#include <timestamp.h>
 #include <vb2_api.h>
 
 #define QCLIB_VERSION 0
@@ -84,10 +86,18 @@ const char *qclib_file_default(enum qclib_cbfs_file file)
 		return CONFIG_CBFS_PREFIX "/dcb";
 	case QCLIB_CBFS_DTB:
 		return CONFIG_CBFS_PREFIX "/dtb";
+	case QCLIB_CBFS_CPR:
+		return CONFIG_CBFS_PREFIX "/cpr";
 	case QCLIB_CBFS_SHRM_META:
 		return CONFIG_CBFS_PREFIX "/shrm_meta";
 	case QCLIB_CBFS_AOP_META:
 		return CONFIG_CBFS_PREFIX "/aop_meta";
+	case QCLIB_CBFS_AOP_DEVCFG_META:
+		return CONFIG_CBFS_PREFIX "/aop_devcfg_meta";
+	case QCLIB_CBFS_APDP_META:
+		return CONFIG_CBFS_PREFIX "/apdp_meta";
+	case QCLIB_CBFS_RAMDUMP_META:
+		return CONFIG_CBFS_PREFIX "/ramdump_meta";
 	default:
 		die("unknown QcLib file %d", file);
 	}
@@ -117,8 +127,7 @@ static void write_ddr_information(struct qclib_cb_if_table_entry *te)
 	*ddr_region = region_create(te->blob_address, ddr_size * MiB);
 
 	/* Use DDR info to configure MMU */
-	qc_mmu_dram_config_post_dram_init(
-		(void *)(uintptr_t)region_offset(ddr_region), region_sz(ddr_region));
+	qc_mmu_dram_config_post_dram_init(region_sz(ddr_region));
 }
 
 static void write_qclib_log_to_cbmemc(struct qclib_cb_if_table_entry *te)
@@ -179,11 +188,35 @@ static void dump_te_table(void)
 
 __weak int qclib_soc_override(struct qclib_cb_if_table *table) { return 0; }
 
+__weak bool qclib_check_dload_mode(void)
+{
+	return false;
+}
+
+static bool qclib_debug_log_level(void)
+{
+	return get_uint_option("qclib_debug_level", 1);
+}
+
 struct prog qclib; /* This will be re-used by qclib_rerun() */
 
 static void qclib_prepare_and_run(void)
 {
 	struct mmu_context pre_qclib_mmu_context;
+	int i;
+
+	/* output area, QCLib copies console log buffer out */
+	if (CONFIG(CONSOLE_CBMEM))
+		qclib_add_if_table_entry(QCLIB_TE_QCLIB_LOG_BUFFER,
+				_qclib_serial_log,
+				REGION_SIZE(qclib_serial_log), 0);
+
+	/* Enable QCLib serial output, if below condition is met */
+	if (CONFIG(CONSOLE_SERIAL) && qclib_debug_log_level())
+		qclib_cb_if_table.global_attributes |=
+			QCLIB_GA_ENABLE_UART_LOGGING;
+
+	dump_te_table();
 
 	printk(BIOS_DEBUG, "Global Attributes[%#x]..Table Entries Count[%d]\n",
 		qclib_cb_if_table.global_attributes,
@@ -205,23 +238,31 @@ static void qclib_prepare_and_run(void)
 	mmu_disable();
 	mmu_restore_context(&pre_qclib_mmu_context);
 	mmu_enable();
+
+	if (qclib_cb_if_table.global_attributes & QCLIB_GA_FORCE_COLD_REBOOT) {
+		printk(BIOS_NOTICE, "QcLib requested cold reboot\n");
+		board_reset();
+	}
+
+	/* step through I/F table, handling return values */
+	for (i = 0; i < qclib_cb_if_table.num_entries; i++)
+		if (qclib_cb_if_table.te[i].blob_attributes &
+				QCLIB_BA_SAVE_TO_STORAGE)
+			write_table_entry(&qclib_cb_if_table.te[i]);
+
+	printk(BIOS_DEBUG, "QCLib completed\n\n\n");
 }
 
 void qclib_load_and_run(void)
 {
-	int i;
 	ssize_t data_size;
+
+	timestamp_add_now(TS_QUALCOMM_QCLIB_INIT_START);
 
 	/* zero ddr_information SRAM region, needs new data each boot */
 	memset(ddr_region, 0, sizeof(struct region));
 
 	init_qclib_cb_if_table(&qclib_cb_if_table);
-
-	/* output area, QCLib copies console log buffer out */
-	if (CONFIG(CONSOLE_CBMEM))
-		qclib_add_if_table_entry(QCLIB_TE_QCLIB_LOG_BUFFER,
-				_qclib_serial_log,
-				REGION_SIZE(qclib_serial_log), 0);
 
 	/* output area, QCLib fills in DDR details */
 	qclib_add_if_table_entry(QCLIB_TE_DDR_INFORMATION, NULL, 0, 0);
@@ -230,11 +271,13 @@ void qclib_load_and_run(void)
 	data_size = mrc_cache_load_current(MRC_TRAINING_DATA, QCLIB_VERSION,
 					   _ddr_training, REGION_SIZE(ddr_training));
 	if (data_size < 0) {
-		printk(BIOS_ERR, "Unable to load previous training data.\n");
+		printk(BIOS_WARNING, "qclib: Invalid MRC data in flash (size: %#zx, expected: %#zx)\n",
+		       data_size, REGION_SIZE(ddr_training));
 		memset(_ddr_training, 0, REGION_SIZE(ddr_training));
+		data_size = REGION_SIZE(ddr_training);
 	}
 	qclib_add_if_table_entry(QCLIB_TE_DDR_TRAINING_DATA,
-				 _ddr_training, REGION_SIZE(ddr_training), 0);
+			_ddr_training, data_size, 0);
 
 	/* Address and size of this entry will be filled in by QcLib. */
 	qclib_add_if_table_entry(QCLIB_TE_MEM_CHIP_INFO, NULL, 0, 0);
@@ -259,11 +302,6 @@ void qclib_load_and_run(void)
 	}
 	qclib_add_if_table_entry(QCLIB_TE_DCB_SETTINGS, _dcb, data_size, 0);
 
-	/* Enable QCLib serial output, based on Kconfig */
-	if (CONFIG(CONSOLE_SERIAL))
-		qclib_cb_if_table.global_attributes =
-			QCLIB_GA_ENABLE_UART_LOGGING;
-
 	if (CONFIG(QC_SDI_ENABLE) && (!CONFIG(VBOOT) ||
 		!vboot_is_gbb_flag_set(VB2_GBB_FLAG_RUNNING_FAFT))) {
 		struct prog qcsdi =
@@ -285,7 +323,27 @@ void qclib_load_and_run(void)
 		goto fail;
 	}
 
-	dump_te_table();
+	/* Load APDP image */
+	if (CONFIG(QC_APDP_ENABLE)) {
+		struct prog apdp_prog =
+				PROG_INIT(PROG_PAYLOAD, CONFIG_CBFS_PREFIX "/apdp");
+
+		if (!selfload(&apdp_prog))
+			die("SOC image: APDP load failed");
+
+		/* Attempt to load apdp_meta Blob. */
+		data_size = cbfs_load(qclib_file(QCLIB_CBFS_APDP_META),
+				_apdp_ramdump_meta, REGION_SIZE(apdp_ramdump_meta));
+		if (!data_size) {
+			printk(BIOS_ERR,
+				"[%s] /apdp_meta not loaded\n"
+				"apdp_meta is mandatory for APDP authentication; failure is fatal\n"
+				, __func__);
+			goto fail;
+		}
+
+		qclib_add_if_table_entry(QCLIB_TE_APDP_META_SETTINGS, _apdp_ramdump_meta, data_size, 0);
+	}
 
 	/* Attempt to load QCLib elf */
 	qclib = (struct prog)
@@ -300,23 +358,11 @@ void qclib_load_and_run(void)
 	printk(BIOS_DEBUG, "\n\n\nEnter QcLib to Initialize DDR and bring up SHRM\n");
 	qclib_prepare_and_run();
 
-	if (qclib_cb_if_table.global_attributes & QCLIB_GA_FORCE_COLD_REBOOT) {
-		printk(BIOS_NOTICE, "QcLib requested cold reboot\n");
-		board_reset();
-	}
-
-	/* step through I/F table, handling return values */
-	for (i = 0; i < qclib_cb_if_table.num_entries; i++)
-		if (qclib_cb_if_table.te[i].blob_attributes &
-				QCLIB_BA_SAVE_TO_STORAGE)
-			write_table_entry(&qclib_cb_if_table.te[i]);
-
 	/* confirm that we received valid ddr information from QCLib */
 	assert((uintptr_t)_dram == region_offset(ddr_region) &&
 		region_sz(ddr_region) >= (u8 *)cbmem_top() - _dram);
 
-	printk(BIOS_DEBUG, "QCLib completed\n\n\n");
-
+	timestamp_add_now(TS_QUALCOMM_QCLIB_INIT_END);
 	return;
 
 fail:
@@ -325,11 +371,19 @@ fail:
 
 void qclib_rerun(void)
 {
+	timestamp_add_now(TS_QUALCOMM_QCLIB_REINIT_START);
+
 	ssize_t data_size;
 
 	assert(prog_type(&qclib) == PROG_REFCODE)
 
 	init_qclib_cb_if_table(&qclib_cb_if_table);
+
+	struct prog aop_cfg_fw_prog =
+				PROG_INIT(PROG_PAYLOAD, CONFIG_CBFS_PREFIX "/aop_cfg");
+
+	if (!selfload(&aop_cfg_fw_prog))
+		die("SOC image: AOP load failed");
 
 	/* Attempt to load aop_meta Blob (reuse the qc_blob_meta region). */
 	data_size = cbfs_load(qclib_file(QCLIB_CBFS_AOP_META),
@@ -341,10 +395,43 @@ void qclib_rerun(void)
 
 	qclib_add_if_table_entry(QCLIB_TE_AOP_META_SETTINGS, _qc_blob_meta, data_size, 0);
 
+	/* Attempt to load aop_devcfg_meta Blob. */
+	data_size = cbfs_load(qclib_file(QCLIB_CBFS_AOP_DEVCFG_META),
+			_aop_blob_meta, REGION_SIZE(aop_blob_meta));
+	if (!data_size) {
+		printk(BIOS_ERR, "[%s] /aop_devcfg_meta failed\n", __func__);
+		goto fail;
+	}
+
+	qclib_add_if_table_entry(QCLIB_TE_AOP_DEVCFG_META_SETTINGS, _aop_blob_meta, data_size, 0);
+
+	if (CONFIG(QC_RAMDUMP_ENABLE) && qclib_check_dload_mode()) {
+		struct prog ramdump_prog =
+				PROG_INIT(PROG_REFCODE, CONFIG_CBFS_PREFIX "/ramdump");
+
+		if (cbfs_prog_stage_load(&ramdump_prog))
+			die("SOC image: ramdump load failed");
+
+		/* Attempt to load ramdump_meta Blob. */
+		data_size = cbfs_load(qclib_file(QCLIB_CBFS_RAMDUMP_META),
+				_apdp_ramdump_meta, REGION_SIZE(apdp_ramdump_meta));
+		if (!data_size) {
+			printk(BIOS_ERR,
+			       "[%s] /ramdump_meta not loaded\n"
+			       "Ramdump will not be captured for crash analysis\n",
+			       __func__);
+
+			goto fail;
+		}
+
+		qclib_add_if_table_entry(QCLIB_TE_RAMDUMP_META_SETTINGS, _apdp_ramdump_meta, data_size, 0);
+	}
+
 	/* Set up the system and jump into QcLib */
 	printk(BIOS_DEBUG, "\n\n\nRe-enter QCLib to bring up AOP\n");
 	qclib_prepare_and_run();
 
+	timestamp_add_now(TS_QUALCOMM_QCLIB_REINIT_END);
 	return;
 
 fail:

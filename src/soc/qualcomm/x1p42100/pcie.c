@@ -11,6 +11,7 @@
 #include <soc/pcie.h>
 
 #define NVME_REG_EN GPIO(18)
+#define NVME_PLN_GPIO GPIO(157)  /* Power Loss Notification */
 
 static const struct qcom_qmp_phy_init_tbl x1p42100_qmp_pcie_serdes_pll_tbl[] = {
 	QMP_PHY_INIT_CFG(QSERDES_V4_PLL_SSC_STEP_SIZE1_MODE1, 0x26),
@@ -64,7 +65,7 @@ static const struct qcom_qmp_phy_init_tbl x1p42100_qmp_pcie_tx_tbl[] = {
 	QMP_PHY_INIT_CFG(QSERDES_V4_TX_RES_CODE_LANE_OFFSET_RX, 0x03),
 	QMP_PHY_INIT_CFG(QSERDES_V4_TX_LANE_MODE_1, 0x01),
 	QMP_PHY_INIT_CFG(QSERDES_V4_TX_LANE_MODE_2, 0x10),
-	QMP_PHY_INIT_CFG(QSERDES_V4_TX_LANE_MODE_3, 0x90),
+	QMP_PHY_INIT_CFG(QSERDES_V4_TX_LANE_MODE_3, 0x51),
 	QMP_PHY_INIT_CFG(QSERDES_V4_TX_TRAN_DRVR_EMP_EN, 0x34),
 };
 
@@ -72,12 +73,11 @@ static const struct qcom_qmp_phy_init_tbl x1p42100_qmp_pcie_rx_tbl[] = {
 	QMP_PHY_INIT_CFG(QSERDES_V4_RX_UCDR_FO_GAIN_RATE2, 0x0C),
 	QMP_PHY_INIT_CFG(QSERDES_V4_RX_UCDR_SO_GAIN_RATE2, 0x04),
 	QMP_PHY_INIT_CFG(QSERDES_V4_RX_UCDR_FO_GAIN_RATE3, 0x0A),
-	QMP_PHY_INIT_CFG(QSERDES_V4_RX_UCDR_SO_GAIN_RATE3, 0x05),
 	QMP_PHY_INIT_CFG(QSERDES_V4_RX_UCDR_PI_CONTROLS, 0x16),
 	QMP_PHY_INIT_CFG(QSERDES_V4_RX_UCDR_SO_ACC_DEFAULT_VAL_RATE3, 0x00),
-	QMP_PHY_INIT_CFG(QSERDES_V4_RX_RX_IVCM_CAL_CTRL2, 0x82),
+	QMP_PHY_INIT_CFG(QSERDES_V4_RX_RX_IVCM_CAL_CTRL2, 0x80),
 	QMP_PHY_INIT_CFG(QSERDES_V4_RX_RX_IVCM_POSTCAL_OFFSET, 0x00),
-	QMP_PHY_INIT_CFG(QSERDES_V4_RX_RX_BKUP_CTRL1, 0x12),
+	QMP_PHY_INIT_CFG(QSERDES_V4_RX_RX_BKUP_CTRL1, 0x15),
 	QMP_PHY_INIT_CFG(QSERDES_V4_RX_DFE_1, 0x01),
 	QMP_PHY_INIT_CFG(QSERDES_V4_RX_DFE_2, 0x01),
 	QMP_PHY_INIT_CFG(QSERDES_V4_RX_DFE_3, 0x45),
@@ -87,13 +87,13 @@ static const struct qcom_qmp_phy_init_tbl x1p42100_qmp_pcie_rx_tbl[] = {
 	QMP_PHY_INIT_CFG(QSERDES_V4_RX_RX_EQU_ADAPTOR_CNTRL4, 0x0B),
 	QMP_PHY_INIT_CFG(QSERDES_V4_RX_SIGDET_ENABLES, 0x1C),
 	QMP_PHY_INIT_CFG(QSERDES_V4_RX_PHPRE_CTRL, 0x20),
-	QMP_PHY_INIT_CFG(QSERDES_V4_RX_DFE_CTLE_POST_CAL_OFFSET, 0x38),
-	QMP_PHY_INIT_CFG(QSERDES_V4_RX_Q_PI_INTRINSIC_BIAS_RATE32, 0x01),
+	QMP_PHY_INIT_CFG(QSERDES_V4_RX_DFE_CTLE_POST_CAL_OFFSET, 0x3A),
+	QMP_PHY_INIT_CFG(QSERDES_V4_RX_Q_PI_INTRINSIC_BIAS_RATE32, 0x39),
 	QMP_PHY_INIT_CFG(QSERDES_V4_RX_RX_MODE_RATE2_B0, 0x14),
 	QMP_PHY_INIT_CFG(QSERDES_V4_RX_RX_MODE_RATE2_B1, 0xB3),
 	QMP_PHY_INIT_CFG(QSERDES_V4_RX_RX_MODE_RATE2_B2, 0x58),
 	QMP_PHY_INIT_CFG(QSERDES_V4_RX_RX_MODE_RATE2_B3, 0x9A),
-	QMP_PHY_INIT_CFG(QSERDES_V4_RX_RX_MODE_RATE2_B4, 0x28),
+	QMP_PHY_INIT_CFG(QSERDES_V4_RX_RX_MODE_RATE2_B4, 0x26),
 	QMP_PHY_INIT_CFG(QSERDES_V4_RX_RX_MODE_RATE2_B5, 0xB6),
 	QMP_PHY_INIT_CFG(QSERDES_V4_RX_RX_MODE_RATE2_B6, 0xEE),
 	QMP_PHY_INIT_CFG(QSERDES_V4_RX_RX_MODE_RATE3_B0, 0xE4),
@@ -104,6 +104,12 @@ static const struct qcom_qmp_phy_init_tbl x1p42100_qmp_pcie_rx_tbl[] = {
 	QMP_PHY_INIT_CFG(QSERDES_V4_RX_RX_MODE_RATE3_B5, 0x76),
 	QMP_PHY_INIT_CFG(QSERDES_V4_RX_RX_MODE_RATE3_B6, 0xFF),
 	QMP_PHY_INIT_CFG(QSERDES_V4_RX_TX_ADPT_CTRL, 0x10),
+};
+
+/* RX1-specific overrides (applied after rx_tbl to RX1 lanes only) */
+static const struct qcom_qmp_phy_init_tbl x1p42100_qmp_pcie_rx_tbl_sec[] = {
+	QMP_PHY_INIT_CFG(QSERDES_V4_RX_VGA_CAL_MAN_VAL, 0x0B),
+	QMP_PHY_INIT_CFG(QSERDES_V4_RX_DFE_CTLE_POST_CAL_OFFSET, 0x38),
 };
 
 static const struct qcom_qmp_phy_init_tbl x1p42100_qmp_pcie_ln_shrd_tbl[] = {
@@ -132,7 +138,7 @@ static const struct qcom_qmp_phy_init_tbl x1p42100_qmp_pcie_ln_shrd_tbl[] = {
 
 static const struct qcom_qmp_phy_init_tbl x1p42100_qmp_pcie_pcs_com_tbl[] = {
 	QMP_PHY_INIT_CFG(QPHY_PCIE4_PCS_COM_G3S2_PRE_GAIN, 0x2E),
-	QMP_PHY_INIT_CFG(QPHY_PCIE4_PCS_COM_RX_SIGDET_LVL, 0xAA),
+	QMP_PHY_INIT_CFG(QPHY_PCIE4_PCS_COM_RX_SIGDET_LVL, 0xCC),
 	QMP_PHY_INIT_CFG(QPHY_PCIE4_PCS_COM_EQ_CONFIG4, 0x00),
 	QMP_PHY_INIT_CFG(QPHY_PCIE4_PCS_COM_EQ_CONFIG5, 0x22),
 };
@@ -231,6 +237,8 @@ static pcie_qmp_phy_cfg_t pcie6a_qmp_phy_1x4 = {
 	.tx_tbl_num             = ARRAY_SIZE(x1p42100_qmp_pcie_tx_tbl),
 	.rx_tbl                 = x1p42100_qmp_pcie_rx_tbl,
 	.rx_tbl_num             = ARRAY_SIZE(x1p42100_qmp_pcie_rx_tbl),
+	.rx_tbl_sec             = x1p42100_qmp_pcie_rx_tbl_sec,
+	.rx_tbl_num_sec         = ARRAY_SIZE(x1p42100_qmp_pcie_rx_tbl_sec),
 	.pcs_tbl                = x1p42100_qmp_pcie_pcs_com_tbl,
 	.pcs_tbl_num            = ARRAY_SIZE(x1p42100_qmp_pcie_pcs_com_tbl),
 	.pcs_misc_tbl           = x1p42100_qmp_pcie_pcs_pcie_tbl,
@@ -294,9 +302,31 @@ int32_t qcom_dw_pcie_enable_clock(void)
 	return ret;
 }
 
+/*
+ * Configure NVMe Power Loss Notification GPIO
+ *
+ * Hamoa target wired the PLN signal to a SoC GPIO. The circuitry
+ * for connecting the PLN from the SoC (1.2volts) to the NVMe (3.3volts)
+ * caused the voltage level on the PLN signal on the NVMe side to be
+ * different depending on the NVMe part. This function will Configure PLN
+ * GPIO in software to make sure the PLN is high and this GPIO can be used
+ * for other HW configurations.
+ */
+static void nvme_core_pln_gpio(void)
+{
+	gpio_configure(NVME_PLN_GPIO,   /* GPIO 157 */
+		       GPIO_FUNC_GPIO,  /* Function, 0 for generic */
+		       GPIO_NO_PULL,    /* Pull */
+		       GPIO_2MA,        /* Drive strength */
+		       GPIO_INPUT);     /* Direction */
+}
+
 /* Turn on NVMe */
 void gcom_pcie_power_on_ep(void)
 {
+	/* Configure Power Loss Notification GPIO before powering on */
+	nvme_core_pln_gpio();
+
 	gpio_output(NVME_REG_EN, 1);
 }
 

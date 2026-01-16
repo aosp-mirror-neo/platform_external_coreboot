@@ -83,7 +83,7 @@ chip soc/intel/tigerlake
 						.time_window_min = 28 * MSECS_PER_SEC,
 						.time_window_max = 32 * MSECS_PER_SEC,
 						.granularity = 125,},
-					.pl2 = {.min_power = 28000,
+					.pl2 = {.min_power = 64000,
 						.max_power = 64000,
 						.time_window_min = 28 * MSECS_PER_SEC,
 						.time_window_max = 32 * MSECS_PER_SEC,
@@ -186,7 +186,7 @@ chip soc/intel/tigerlake
 				register "generic.wake" = "GPE0_DW2_15"
 				register "generic.detect" = "1"
 				register "hid_desc_reg_offset" = "0x01"
-				device i2c 15 on end
+				device i2c 15 alias touchpad on end
 			end
 		end
 		device ref pch_espi on

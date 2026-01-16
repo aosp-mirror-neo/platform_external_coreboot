@@ -152,7 +152,11 @@ static void cgpll_clock_gate_init(void)
 	t = misc_read32(MISC_CLKGATEDCNTL);
 	t |= ALINKCLK_GATEOFFEN;
 	t |= BLINKCLK_GATEOFFEN;
-	t |= XTAL_PAD_S3_TURNOFF_EN;
+
+	if (!CONFIG(KEEP_ACP_RUNNING_IN_S3)) {
+		t |= XTAL_PAD_S3_TURNOFF_EN;
+	}
+
 	t |= XTAL_PAD_S5_TURNOFF_EN;
 	misc_write32(MISC_CLKGATEDCNTL, t);
 
@@ -169,7 +173,9 @@ static void cgpll_clock_gate_init(void)
 
 void fch_init(void *chip_info)
 {
-	set_resets_to_cold();
+	if (!CONFIG(SOC_AMD_RENOIR))
+		set_resets_to_cold();
+
 	i2c_soc_init();
 	fch_init_acpi_ports();
 

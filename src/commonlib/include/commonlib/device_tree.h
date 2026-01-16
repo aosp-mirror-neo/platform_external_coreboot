@@ -189,8 +189,10 @@ void dt_add_string_prop(struct device_tree_node *node, const char *name,
 			const char *str);
 void dt_add_u32_prop(struct device_tree_node *node, const char *name, u32 val);
 void dt_add_u64_prop(struct device_tree_node *node, const char *name, u64 val);
-void dt_add_reg_prop(struct device_tree_node *node, u64 *addrs, u64 *sizes,
+void dt_add_reg_prop(struct device_tree_node *node, const u64 *addrs, const u64 *sizes,
 		     int count, u32 addr_cells, u32 size_cells);
+void dt_add_iommu_addr_prop(struct device_tree_node *node, const u64 *addrs, const u64 *sizes,
+			    int count, u32 addr_cells, u32 size_cells);
 int dt_set_bin_prop_by_path(struct device_tree *tree, const char *path,
 			    void *data, size_t size, int create);
 
@@ -231,5 +233,23 @@ int dt_apply_fixups(struct device_tree *tree);
  * Init/retrieve the /reserved-memory/ node.
  */
 struct device_tree_node *dt_init_reserved_memory_node(struct device_tree *tree);
+
+/* Check whether a devicetree is an overlay device tree */
+bool dt_is_overlay(struct device_tree *tree);
+
+/*
+ * dt_add_reserved_memory_region - Helper to add a node under `/reserved-memory`
+ * @tree: The device tree structure
+ * @name: Name of the child node (e.g., "ramoops", "pkvm-drng-seed")
+ * @compatible: Compatible string (optional, pass NULL if not needed)
+ * @addr: Physical start address
+ * @size: Size of the region
+ * @nomap: Boolean, if true adds the "no-map" property
+ *
+ * Returns the created node on success, NULL on failure.
+ */
+struct device_tree_node *dt_add_reserved_memory_region(struct device_tree *tree,
+		      const char *name, const char *compatible, uint64_t addr, uint64_t size,
+		      bool nomap);
 
 #endif /* __COMMONLIB_DEVICE_TREE_H__ */

@@ -7,15 +7,15 @@ description: "coreboot is an extended firmware platform that delivers a lightnin
 third_party {
   license_type: RESTRICTED
   last_upgrade_date {
-    year: 2025
-    month: 8
-    day: 6
+    year: 2026
+    month: 1
+    day: 16
   }
   homepage: "https://www.coreboot.org/"
   identifier {
     type: "Git"
     value: "https://review.coreboot.org/coreboot.git"
-    version: "f01cc9258be9b0ebffaf9e265f4778d1aea048ff"
+    version: "b5ad97a2688bd734d352a9c2ec447c3e360e118a"
     primary_source: true
   }
 }

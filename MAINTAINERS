@@ -200,16 +200,6 @@ F:	src/mainboard/asrock/z97_extreme6/
 
 
 
-ASUS A88XM-E MAINBOARD
-M:	Mike Banon <mikebdp2@gmail.com>
-S:	Maintained
-F:	src/mainboard/asus/a88xm-e/
-
-ASUS AM1I-A MAINBOARD
-M:	Mike Banon <mikebdp2@gmail.com>
-S:	Maintained
-F:	src/mainboard/asus/am1i-a/
-
 ASUS H61 SERIES MAINBOARDS
 M:	Angel Pons <th3fanbus@gmail.com>
 S:	Maintained
@@ -226,11 +216,11 @@ M:	Angel Pons <th3fanbus@gmail.com>
 S:	Maintained
 F:	src/mainboard/asus/p5qpl-am/
 
-ASUS P8Z77 SERIES MAINBOARDS
+ASUS P8X7X SERIES MAINBOARDS
 M:	Angel Pons <th3fanbus@gmail.com>
 M:	Vlado Cibic <vladocb@protonmail.com>
 S:	Maintained
-F:	src/mainboard/asus/p8z77-series/
+F:	src/mainboard/asus/p8x7x-series/
 
 
 
@@ -273,9 +263,9 @@ F:	src/mainboard/dell/
 DELL LATITUDE MAINBOARDS
 M:	Nicholas Chin <nic.c3.14@gmail.com>
 S:	Maintained
-F:	src/mainboard/dell/e6400/
+F:	src/mainboard/dell/gm45_latitude/
 F:	src/mainboard/dell/snb_ivb_latitude/
-F:	src/mainboard/dell/e7240/
+F:	src/mainboard/dell/haswell_latitude/
 
 
 EMULATION MAINBOARDS
@@ -332,6 +322,7 @@ F:	src/mainboard/gigabyte/ga-h61m-series/
 GOOGLE BLUEY MAINBOARDS
 M:	Subrata Banik <subratabanik@google.com>
 M:	Kapil Porwal <kapilporwal@google.com>
+M:	Jayvik Desai <jayvik@google.com>
 F:	src/mainboard/google/bluey/
 
 GOOGLE REX MAINBOARDS
@@ -405,6 +396,7 @@ F:	src/mainboard/google/guybrush/
 F:	src/mainboard/google/skyrim/
 
 GOOGLE MEDIATEK-BASED MAINBOARDS
+M:	Chen-Tsung Hsieh <chentsung@google.com>
 M:	Hung-Te Lin <hungte@chromium.org>
 M:	Yu-Ping Wu <yupingso@google.com>
 M:	Yidi Lin <yidilin@google.com>
@@ -474,11 +466,6 @@ LENOVO MAINBOARDS
 M:	Alexander Couzens <lynxis@fe80.eu>
 S:	Maintained
 F:	src/mainboard/lenovo/
-
-LENOVO G505S MAINBOARD
-M:	Mike Banon <mikebdp2@gmail.com>
-S:	Maintained
-F:	src/mainboard/lenovo/g505s/
 
 LENOVO X200 MAINBOARD
 R:	Stefan Ott <coreboot@desire.ch>
@@ -904,8 +891,8 @@ M:	Piotr Król <piotr.krol@3mdeb.com>
 M:	Michał Żygowski <michal.zygowski@3mdeb.com>
 M:	Frans Hendriks <fhendriks@eltan.com>
 S:	Maintained
-F:	/src/soc/intel/braswell/
-F:	/src/vendorcode/intel/fsp/fsp1_1/braswell/
+F:	src/soc/intel/braswell/
+F:	src/vendorcode/intel/fsp/fsp1_1/braswell/
 
 INTEL CANNONLAKE SOC
 S:	Orphan
@@ -968,7 +955,7 @@ M:	Lean Sheng Tan <sheng.tan@9elements.com>
 S:	Supported
 F:	src/soc/intel/xeon_sp/
 F:	src/vendorcode/intel/fsp/fsp2_0/skylake_sp/
-F:	src/vendorcode/intel/fsp/fsp2_0/copperlake_sp/
+F:	src/vendorcode/intel/fsp/fsp2_0/cooperlake_sp/
 F:	src/vendorcode/intel/fsp/fsp2_0/sapphirerapids_sp/
 F:	src/vendorcode/intel/fsp/fsp2_0/graniterapids/
 
@@ -988,6 +975,7 @@ F:	src/vendorcode/mediatek/mt8192/
 QUALCOMM SOCS
 M:	Subrata Banik <subratabanik@google.com>
 M:	Kapil Porwal <kapilporwal@google.com>
+M:	Jayvik Desai <jayvik@google.com>
 F:	src/soc/qualcomm/
 
 ORPHANED ARM SOCS
@@ -996,7 +984,7 @@ F:	src/cpu/armltd/
 F:	src/soc/ti/
 F:	src/soc/samsung/
 F:	util/exynos/
-F:	util/ipqheader/
+F:	util/qualcomm/
 
 ################################################################################
 # Payloads
@@ -1073,7 +1061,7 @@ F:	util/docker/
 
 GIT
 F:	.git*
-F:	/util/gitconfig
+F:	util/gitconfig/
 
 HDA DECODER
 M:	Nicholas Sudsgaard <devel+coreboot@nsudsgaard.com>
@@ -1147,8 +1135,6 @@ M:	Yu-Ping Wu <yupingso@google.com>
 S:	Supported
 F:	3rdparty/vboot/
 F:	src/security/vboot/
-F:	src/include/tpm.h
-F:	src/include/tpm_lite/
 
 RESOURCE ALLOCATOR
 F:	src/device/*
@@ -1170,7 +1156,7 @@ F:	util/cbfstool/
 
 CBMEM
 F:	src/include/cbmem.h
-F:	src/include/cbmem_id.h
+F:	src/commonlib/bsd/include/commonlib/bsd/cbmem_id.h
 F:	util/cbmem/
 
 CONSOLE

@@ -40,8 +40,8 @@ static const struct pad_config gpio_table[] = {
 	PAD_CFG_GPI_SCI_LOW(GPP_A12, NONE, DEEP, LEVEL),
 	/* GPP_A13:     Not used */
 	PAD_NC(GPP_A13, NONE),
-	/* GPP_A15:     HW_ID1 */
-	PAD_CFG_GPI(GPP_A15, NONE, PLTRST),
+	/* GPP_A15:     Not used */
+	PAD_NC(GPP_A15, NONE),
 	/* GPP_A16:     BT_RF_KILL_N */
 	PAD_CFG_GPO(GPP_A16, 1, DEEP),
 	/* GPP_A17:     PCH_WLAN_OFF_N */
@@ -93,8 +93,8 @@ static const struct pad_config gpio_table[] = {
 	PAD_CFG_GPO(GPP_B21, 0, DEEP),
 	/* GPP_B22:     Not used */
 	PAD_NC(GPP_B22, NONE),
-	/* GPP_B23:     HW_ID0 */
-	PAD_CFG_GPI(GPP_B23, NONE, PLTRST),
+	/* GPP_B23:     Not used */
+	PAD_NC(GPP_B23, NONE),
 	/* GPP_B24:     ESPI_ALERT0_N */
 	PAD_CFG_NF_IOSSTATE(GPP_B24, UP_20K, DEEP, NF1, IGNORE),
 	/* GPP_B25:     Not used */
@@ -187,7 +187,7 @@ static const struct pad_config gpio_table[] = {
 	/* GPP_D17:     PCH_DMIC_DATA1 */
 	PAD_CFG_NF(GPP_D17, NONE, DEEP, NF3),
 	/* GPP_D18:     PCIE_CLKREQ_SD_N */
-	PAD_CFG_NF(GPP_D18, NONE, DEEP, NF1),
+	PAD_NC(GPP_D18, NONE),
 	/* GPP_D19:     NC */
 	PAD_NC(GPP_D19, NONE),
 	/* GPP_D20:     NC */
@@ -288,8 +288,13 @@ static const struct pad_config gpio_table[] = {
 	PAD_NC(GPP_F18, NONE),
 	/* GPP_F19:     GPP_F19 */
 	PAD_NC(GPP_F19, NONE),
-	/* GPP_F20:     NC */
+#if CONFIG(BOARD_GOOGLE_FELINO4ES)
+	/* GPP_F20:     Not used */
 	PAD_NC(GPP_F20, NONE),
+#else
+	/* GPP_F20:     SOC_SSD1_RST# */
+	PAD_CFG_GPO(GPP_F20, 1, PLTRST),
+#endif
 	/* GPP_F22:     NC */
 	PAD_NC(GPP_F22, NONE),
 	/* GPP_F23:     NC */

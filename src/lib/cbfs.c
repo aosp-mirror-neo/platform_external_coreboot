@@ -31,6 +31,11 @@ struct mem_pool cbfs_cache =
 	MEM_POOL_INIT(_cbfs_cache, REGION_SIZE(cbfs_cache), CONFIG_CBFS_CACHE_ALIGN);
 #endif
 
+__weak const char *cbfs_fmap_region_hint(void)
+{
+	return "COREBOOT";
+}
+
 static void switch_to_postram_cache(int unused)
 {
 	if (_preram_cbfs_cache != _postram_cbfs_cache)
@@ -145,17 +150,18 @@ static inline bool cbfs_lzma_enabled(void)
 	/* Payload loader (ramstage) always needs LZMA. */
 	if (ENV_PAYLOAD_LOADER)
 		return true;
-	/* Only other use of LZMA is ramstage compression. */
-	if (!CONFIG(COMPRESS_RAMSTAGE_LZMA))
-		return false;
-	/* If there is a postcar, it loads the ramstage. */
-	if (CONFIG(POSTCAR_STAGE))
-		return ENV_POSTCAR;
-	/* If there is no postcar but a separate romstage, it loads the ramstage. */
-	if (CONFIG(SEPARATE_ROMSTAGE))
-		return ENV_SEPARATE_ROMSTAGE;
-	/* Otherwise, the combined bootblock+romstage loads the ramstage. */
-	return ENV_BOOTBLOCK;
+	if (ENV_RAMSTAGE_LOADER && CONFIG(COMPRESS_RAMSTAGE_LZMA))
+		return true;
+	return false;
+}
+
+static inline bool cbfs_zstd_enabled(void)
+{
+	if (ENV_PAYLOAD_LOADER && CONFIG(COMPRESSED_PAYLOAD_ZSTD))
+		return true;
+	if (ENV_RAMSTAGE_LOADER && CONFIG(COMPRESS_RAMSTAGE_ZSTD))
+		return true;
+	return false;
 }
 
 static bool cbfs_file_hash_mismatch(const void *buffer, size_t size,
@@ -167,7 +173,12 @@ static bool cbfs_file_hash_mismatch(const void *buffer, size_t size,
 
 	const struct vb2_hash *hash = NULL;
 
-	if (CONFIG(CBFS_VERIFICATION) && !skip_verification) {
+	/*
+	 * Skipping this block in SMM because vboot library isn't linked to SMM stage.  This is
+	 * an issue only if using a CMOS options backend, then SMM refers to an option and tries
+	 * to verify cmos.layout here.
+	 */
+	if (CONFIG(CBFS_VERIFICATION) && !ENV_SMM && !skip_verification) {
 		hash = cbfs_file_hash(mdata);
 		if (!hash) {
 			ERROR("'%s' does not have a file hash!\n", mdata->h.filename);
@@ -266,6 +277,24 @@ static size_t cbfs_load_and_decompress(const struct region_device *rdev, void *b
 			timestamp_add_now(TS_ULZMA_START);
 			out_size = ulzman(map, in_size, buffer, buffer_size);
 			timestamp_add_now(TS_ULZMA_END);
+		}
+
+		rdev_munmap(rdev, map);
+
+		return out_size;
+	case CBFS_COMPRESS_ZSTD:
+		if (!cbfs_zstd_enabled())
+			return 0;
+
+		map = rdev_mmap_full(rdev);
+		if (map == NULL)
+			return 0;
+
+		if (!cbfs_file_hash_mismatch(map, in_size, mdata, skip_verification)) {
+			/* Note: timestamp not useful for memory-mapped media (x86) */
+			timestamp_add_now(TS_UZSTDF_START);
+			out_size = uzstdn(map, in_size, buffer, buffer_size);
+			timestamp_add_now(TS_UZSTDF_END);
 		}
 
 		rdev_munmap(rdev, map);
@@ -522,7 +551,8 @@ void *_cbfs_alloc(const char *name, cbfs_allocator_t allocator, void *arg,
 }
 
 void *_cbfs_unverified_area_alloc(const char *area, const char *name,
-				  cbfs_allocator_t allocator, void *arg, size_t *size_out)
+				  cbfs_allocator_t allocator, void *arg, size_t *size_out,
+				  enum cbfs_type *type)
 {
 	struct region_device area_rdev, file_rdev;
 	union cbfs_mdata mdata;
@@ -536,6 +566,17 @@ void *_cbfs_unverified_area_alloc(const char *area, const char *name,
 	if (cbfs_lookup(&area_rdev, name, &mdata, &data_offset, NULL)) {
 		ERROR("'%s' not found in '%s'\n", name, area);
 		return NULL;
+	}
+
+	if (type) {
+		const enum cbfs_type real_type = be32toh(mdata.h.type);
+		if (*type == CBFS_TYPE_QUERY)
+			*type = real_type;
+		else if (*type != real_type) {
+			ERROR("'%s' type mismatch (is %u, expected %u)\n",
+			      mdata.h.filename, real_type, *type);
+			return NULL;
+		}
 	}
 
 	if (rdev_chain(&file_rdev, &area_rdev, data_offset, be32toh(mdata.h.len)))
@@ -670,6 +711,7 @@ enum cb_err cbfs_init_boot_device(const struct cbfs_boot_device *cbd,
 
 const struct cbfs_boot_device *cbfs_get_boot_device(bool force_ro)
 {
+	printk(BIOS_DEBUG, "Starting cbfs_boot_device\n");
 	static struct cbfs_boot_device ro;
 
 	/* Ensure we always init RO mcache, even if the first file is from the RW CBFS.
@@ -693,8 +735,14 @@ const struct cbfs_boot_device *cbfs_get_boot_device(bool force_ro)
 	if (region_device_sz(&ro.rdev))
 		return &ro;
 
-	if (fmap_locate_area_as_rdev("COREBOOT", &ro.rdev))
-		die("Cannot locate primary CBFS");
+	/* Falls back to the default COREBOOT region if no overriding mechanisms are in
+	   place (e.g. Intel Top Swap). */
+	const char *region = cbfs_fmap_region_hint();
+
+	if (fmap_locate_area_as_rdev(region, &ro.rdev))
+		die("Cannot locate %s CBFS", region);
+
+	printk(BIOS_INFO, "Booting from %s region\n", region);
 
 	if (ENV_INITIAL_STAGE) {
 		enum cb_err err = cbfs_init_boot_device(&ro, metadata_hash_get());

@@ -142,13 +142,13 @@ static void lb_pcie(struct lb_header *header)
 static void lb_framebuffer(struct lb_header *header)
 {
 	struct lb_framebuffer *framebuffer;
-	struct lb_framebuffer fb = {0};
+	const struct lb_framebuffer *fb;
 
-	if (!CONFIG(LINEAR_FRAMEBUFFER) || fill_lb_framebuffer(&fb))
+	if (!CONFIG(LINEAR_FRAMEBUFFER) || !(fb = get_lb_framebuffer()))
 		return;
 
 	framebuffer = (struct lb_framebuffer *)lb_new_record(header);
-	memcpy(framebuffer, &fb, sizeof(*framebuffer));
+	memcpy(framebuffer, fb, sizeof(*framebuffer));
 	framebuffer->tag = LB_TAG_FRAMEBUFFER;
 	framebuffer->size = sizeof(*framebuffer);
 
@@ -274,6 +274,7 @@ static void add_cbmem_pointers(struct lb_header *header)
 		{CBMEM_ID_FMAP, LB_TAG_FMAP},
 		{CBMEM_ID_VBOOT_WORKBUF, LB_TAG_VBOOT_WORKBUF},
 		{CBMEM_ID_TYPE_C_INFO, LB_TAG_TYPE_C_INFO},
+		{CBMEM_ID_RB_INFO, LB_TAG_ROOT_BRIDGE_INFO},
 	};
 	int i;
 
@@ -464,6 +465,13 @@ static void lb_add_acpi_rsdp(struct lb_header *head)
 	acpi_rsdp->rsdp_pointer = get_coreboot_rsdp();
 }
 
+/*
+ * Not all platform would need to fill in the boot mode information.
+ * This is useful for platform that would like to implement battery
+ * charging solution in AP firmware.
+ */
+void __weak lb_add_boot_mode(struct lb_header *header) { /* NOOP */ }
+
 size_t write_coreboot_forwarding_table(uintptr_t entry, uintptr_t target)
 {
 	struct lb_header *head;
@@ -584,6 +592,8 @@ static uintptr_t write_coreboot_table(uintptr_t rom_table_end)
 
 	if (CONFIG(HAVE_ACPI_TABLES))
 		lb_add_acpi_rsdp(head);
+
+	lb_add_boot_mode(head);
 
 	/* Remember where my valid memory ranges are */
 	return lb_table_fini(head);

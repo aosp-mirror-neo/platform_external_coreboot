@@ -1,7 +1,9 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 
+#include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
+#include <acpi/acpi.h>
 #include <assert.h>
 #include <console/console.h>
 #include <delay.h>
@@ -9,6 +11,7 @@
 #include <device/path.h>
 #include <elog.h>
 #include <halt.h>
+#include <option.h>
 #include <reset.h>
 #include <rtc.h>
 #include <security/vboot/vboot_common.h>
@@ -104,6 +107,149 @@ int google_chromeec_kbbacklight(int percent)
 		return -1;
 
 	return 0;
+}
+
+bool google_chromeec_has_kbbacklight(void)
+{
+	/* Try the feature flag (most reliable for modern ECs) */
+	int feature_check = google_chromeec_check_feature(EC_FEATURE_PWM_KEYB);
+
+	if (feature_check > 0) {
+		printk(BIOS_DEBUG, "Chrome EC: Keyboard backlight detected (feature flag)\n");
+		return true;
+	} else if (feature_check == 0) {
+		printk(BIOS_DEBUG, "Chrome EC: No keyboard backlight (feature flag)\n");
+		return false;
+	}
+
+	printk(BIOS_DEBUG, "Chrome EC: Feature flag unavailable, testing backlight read\n");
+	struct ec_response_pwm_get_keyboard_backlight resp = {};
+
+	if (ec_cmd_pwm_get_keyboard_backlight(PLAT_EC, &resp) == 0) {
+		printk(BIOS_DEBUG, "Chrome EC: Keyboard backlight detected (read test)\n");
+		return true;
+	} else {
+		printk(BIOS_DEBUG, "Chrome EC: No keyboard backlight (read test)\n");
+		return false;
+	}
+}
+
+static bool google_chromeec_rgb_color_to_struct(enum google_chromeec_rgbkbd_color color,
+						struct rgb_s *rgb)
+{
+	switch (color) {
+	case GOOGLE_CHROMEEC_RGBKBD_COLOR_OFF:
+		*rgb = (struct rgb_s){ .r = 0x00, .g = 0x00, .b = 0x00 };
+		return true;
+	case GOOGLE_CHROMEEC_RGBKBD_COLOR_RED:
+		*rgb = (struct rgb_s){ .r = 0xFF, .g = 0x00, .b = 0x00 };
+		return true;
+	case GOOGLE_CHROMEEC_RGBKBD_COLOR_GREEN:
+		*rgb = (struct rgb_s){ .r = 0x00, .g = 0xFF, .b = 0x00 };
+		return true;
+	case GOOGLE_CHROMEEC_RGBKBD_COLOR_BLUE:
+		*rgb = (struct rgb_s){ .r = 0x00, .g = 0x00, .b = 0xFF };
+		return true;
+	case GOOGLE_CHROMEEC_RGBKBD_COLOR_YELLOW:
+		*rgb = (struct rgb_s){ .r = 0xFF, .g = 0xFF, .b = 0x00 };
+		return true;
+	case GOOGLE_CHROMEEC_RGBKBD_COLOR_WHITE:
+		*rgb = (struct rgb_s){ .r = 0xFF, .g = 0xFF, .b = 0xFF };
+		return true;
+	default:
+		printk(BIOS_DEBUG, "Chrome EC: Invalid RGB keyboard color: %d\n", color);
+		return false;
+	}
+}
+
+bool google_chromeec_has_rgbkbd(void)
+{
+	struct ec_params_rgbkbd params = {
+		.subcmd = EC_RGBKBD_SUBCMD_GET_CONFIG,
+	};
+	struct ec_response_rgbkbd resp = {};
+
+	/* Query the EC to determine if RGB keyboard is supported. */
+	if (ec_cmd_rgbkbd(PLAT_EC, &params, &resp) == 0 &&
+			resp.rgbkbd_type != EC_RGBKBD_TYPE_UNKNOWN) {
+		printk(BIOS_DEBUG, "ChromeEC: RGB keyboard detected (type: %d)\n", resp.rgbkbd_type);
+		return true;
+	}
+
+	printk(BIOS_DEBUG, "Chrome EC: No RGB keyboard\n");
+	return false;
+}
+
+int google_chromeec_rgbkbd_set_color(enum google_chromeec_rgbkbd_color color)
+{
+	struct rgb_s target_rgb;
+
+	if (!google_chromeec_rgb_color_to_struct(color, &target_rgb))
+		return -1;
+
+	/*
+	 * Disable any demo mode so the keyboard will honour the static color
+	 * we are about to set. Ignore failures in case older firmware doesn't
+	 * implement the subcommand.
+	 */
+	struct ec_params_rgbkbd params = {
+		.subcmd = EC_RGBKBD_SUBCMD_DEMO,
+		.demo = EC_RGBKBD_DEMO_OFF,
+	};
+	struct ec_response_rgbkbd resp = {};
+
+	(void)ec_cmd_rgbkbd(PLAT_EC, &params, &resp);
+
+	params = (struct ec_params_rgbkbd){
+		.subcmd = EC_RGBKBD_SUBCMD_CLEAR,
+		.color = target_rgb,
+	};
+
+	if (ec_cmd_rgbkbd(PLAT_EC, &params, &resp) != 0)
+		return -1;
+
+	printk(BIOS_DEBUG, "Chrome EC: RGB keyboard color set to RGB %02x,%02x,%02x\n",
+			target_rgb.r, target_rgb.g, target_rgb.b);
+
+	return 0;
+}
+
+bool google_chromeec_has_fan(void)
+{
+	/* Try the PWM fan feature flag (most reliable for modern ECs) */
+	int feature_check = google_chromeec_check_feature(EC_FEATURE_PWM_FAN);
+
+	if (feature_check > 0) {
+		printk(BIOS_DEBUG, "Chrome EC: Fan detected (feature flag)\n");
+		return true;
+	} else if (feature_check == 0) {
+		printk(BIOS_DEBUG, "Chrome EC: No fan (feature flag)\n");
+		return false;
+	}
+
+	/* Feature flag unavailable, try reading fan duty as a fallback test */
+	printk(BIOS_DEBUG, "Chrome EC: Feature flag unavailable, testing fan read\n");
+	const struct ec_params_pwm_get_fan_duty params = {
+		.fan_idx = 0,
+	};
+	struct ec_response_pwm_get_fan_rpm resp = {};
+	struct chromeec_command cmd = {
+		.cmd_code = EC_CMD_PWM_GET_FAN_TARGET_RPM,
+		.cmd_version = 0,
+		.cmd_data_in = &params,
+		.cmd_size_in = sizeof(params),
+		.cmd_data_out = &resp,
+		.cmd_size_out = sizeof(resp),
+		.cmd_dev_index = 0,
+	};
+
+	if (google_chromeec_command(&cmd) == 0) {
+		printk(BIOS_DEBUG, "Chrome EC: Fan detected (read test)\n");
+		return true;
+	} else {
+		printk(BIOS_DEBUG, "Chrome EC: No fan (read test)\n");
+		return false;
+	}
 }
 
 void google_chromeec_post(uint8_t postcode)
@@ -659,29 +805,43 @@ int google_chromeec_reboot(enum ec_reboot_cmd type, uint8_t flags)
 	return ec_cmd_reboot_ec(PLAT_EC, &params);
 }
 
-static int cbi_get_uint32(uint32_t *id, uint32_t tag)
+void google_chromeec_ap_poweroff(void)
+{
+	if (ec_cmd_ap_shutdown(PLAT_EC))
+		printk(BIOS_ERR, "Failed to power off the AP.\n");
+	halt();
+}
+
+static int cbi_read(void *buf, size_t bufsize, uint32_t tag, bool check_size)
 {
 	struct ec_params_get_cbi params = {
 		.tag = tag,
 	};
-	uint32_t r = 0;
 	struct chromeec_command cmd = {
 		.cmd_code = EC_CMD_GET_CROS_BOARD_INFO,
 		.cmd_version = 0,
 		.cmd_data_in = &params,
-		.cmd_data_out = &r,
+		.cmd_data_out = buf,
 		.cmd_size_in = sizeof(params),
-		.cmd_size_out = sizeof(r),
-		.cmd_dev_index = 0,
+		.cmd_size_out = bufsize,
 	};
-	int rv;
 
-	rv = google_chromeec_command(&cmd);
-	if (rv != 0)
+	int rv = google_chromeec_command(&cmd);
+	if (rv)
 		return rv;
 
-	*id = r;
+	if (check_size && cmd.cmd_size_out != bufsize) {
+		printk(BIOS_ERR, "Wrong out size for CBI tag %d: expected %zu, got %u\n",
+		       tag, bufsize, cmd.cmd_size_out);
+		return -1;
+	}
+
 	return 0;
+}
+
+static int cbi_get_uint32(uint32_t *id, uint32_t tag)
+{
+	return cbi_read(id, sizeof(*id), tag, true);
 }
 
 int google_chromeec_cbi_get_sku_id(uint32_t *id)
@@ -704,7 +864,24 @@ uint32_t google_chromeec_get_board_sku(void)
 
 int google_chromeec_cbi_get_fw_config(uint64_t *fw_config)
 {
+	int rv;
 	uint32_t config;
+
+	_Static_assert(!CONFIG(EC_GOOGLE_CHROMEEC_FW_CONFIG_FROM_UFSC) ||
+		       !CONFIG(EC_GOOGLE_CHROMEEC_INCLUDE_SSFC_IN_FW_CONFIG),
+		       "EC_GOOGLE_CHROMEEC_FW_CONFIG_FROM_UFSC and "
+		       "EC_GOOGLE_CHROMEEC_INCLUDE_SSFC_IN_FW_CONFIG are conflicting");
+
+	if (CONFIG(EC_GOOGLE_CHROMEEC_FW_CONFIG_FROM_UFSC)) {
+		struct cbi_ufsc ufsc;
+		rv = cbi_read(&ufsc, sizeof(ufsc), CBI_TAG_UFSC, true);
+		if (rv)
+			return rv;
+		_Static_assert(sizeof(*fw_config) == sizeof(ufsc.data[0]) * 2,
+			       "Wrong UFSC size");
+		*fw_config = ufsc.data[0] | ((uint64_t)ufsc.data[1] << 32);
+		return 0;
+	}
 
 	if (cbi_get_uint32(&config, CBI_TAG_FW_CONFIG))
 		return -1;
@@ -753,27 +930,14 @@ bool google_chromeec_get_ucsi_enabled(void)
 
 static int cbi_get_string(char *buf, size_t bufsize, uint32_t tag)
 {
-	struct ec_params_get_cbi params = {
-		.tag = tag,
-	};
-	struct chromeec_command cmd = {
-		.cmd_code = EC_CMD_GET_CROS_BOARD_INFO,
-		.cmd_version = 0,
-		.cmd_data_in = &params,
-		.cmd_data_out = buf,
-		.cmd_size_in = sizeof(params),
-		.cmd_size_out = bufsize,
-	};
 	int rv;
 
-	rv = google_chromeec_command(&cmd);
-	if (rv != 0)
-		return rv;
+	rv = cbi_read(buf, bufsize, tag, false);
 
 	/* Ensure NUL termination. */
 	buf[bufsize - 1] = '\0';
 
-	return 0;
+	return rv;
 }
 
 int google_chromeec_cbi_get_dram_part_num(char *buf, size_t bufsize)
@@ -1003,18 +1167,9 @@ bool google_chromeec_is_usb_pd_attached(void)
 /* This API checks if charger is present. */
 bool google_chromeec_is_charger_present(void)
 {
-	struct ec_params_battery_dynamic_info params = {
-		.index = 0,
-	};
-	struct ec_response_battery_dynamic_info resp;
-
-	if (ec_cmd_battery_get_dynamic(PLAT_EC, &params, &resp) == 0) {
-		/* Check if AC charger is present */
-		if (resp.flags & EC_BATT_FLAG_AC_PRESENT)
-			return true;
-	}
-
-	return false;
+	/* Check if the EC has posted the AC connect event. */
+	return !!(google_chromeec_get_events_b() &
+		  EC_HOST_EVENT_MASK(EC_HOST_EVENT_AC_CONNECTED));
 }
 
 /*
@@ -1282,9 +1437,18 @@ void google_chromeec_init(void)
 	google_chromeec_log_uptimeinfo();
 
 	/* Enable automatic fan control */
-	if (CONFIG(EC_GOOGLE_CHROMEEC_AUTO_FAN_CTRL)) {
+	if (get_uint_option("auto_fan_control", CONFIG(EC_GOOGLE_CHROMEEC_AUTO_FAN_CTRL))) {
 		ec_cmd_thermal_auto_fan_ctrl(PLAT_EC);
 	}
+
+	/* Set keyboard backlight */
+	int backlight_level = get_uint_option("ec_kb_backlight", -1);
+	if (backlight_level != -1 && !acpi_is_wakeup_s3() && google_chromeec_has_kbbacklight())
+		google_chromeec_kbbacklight(backlight_level);
+
+	int rgb_color = get_uint_option("ec_rgb_kb_color", -1);
+	if (rgb_color != -1 && !acpi_is_wakeup_s3() && google_chromeec_has_rgbkbd())
+		google_chromeec_rgbkbd_set_color((enum google_chromeec_rgbkbd_color)rgb_color);
 }
 
 int google_ec_running_ro(void)
@@ -1695,4 +1859,84 @@ void platform_do_early_poweroff(void)
 {
 	google_chromeec_reboot(EC_REBOOT_COLD_AP_OFF, 0);
 	halt();
+}
+
+/*
+ * Reads the current battery charge percentage using CHARGE_STATE_CMD_GET_STATE CMD.
+ *
+ * This function communicates with the Embedded Controller (EC) via a host
+ * command to retrieve the "State of Charge" (SoC) as calculated by the battery fuel gauge.
+ *
+ * Return: 0 on success, -1 on failure (communication error or EC rejection).
+ * Return Value (state): Pointer to a uint32_t where the battery state of charge
+ * (0-100) will be stored.
+ */
+static int google_chromeec_read_batt_state_of_charge_cmd(uint32_t *state)
+{
+	struct ec_params_charge_state params;
+	struct ec_response_charge_state resp;
+
+	params.cmd = CHARGE_STATE_CMD_GET_STATE;
+
+	if (ec_cmd_charge_state(PLAT_EC, &params, &resp) < 0)
+		return -1;
+
+	*state = resp.get_state.batt_state_of_charge;
+	return 0;
+}
+
+/*
+ * Calculates SoC from dynamic battery data.
+ *
+ * This function fetches "dynamic" battery metrics (voltage, current, and capacity)
+ * and manually calculates the percentage. This is often used when the high-level
+ * "Get Charge State" command is unavailable.
+ *
+ * Return: 0 on success, -1 on communication failure or invalid battery data.
+ * Return Value (state): Pointer to store the calculated State of Charge (0-100%).
+ */
+static int google_chromeec_read_batt_state_of_charge_raw(uint32_t *state)
+{
+	struct ec_params_battery_dynamic_info params = {
+		.index = 0,
+	};
+	struct ec_response_battery_dynamic_info resp;
+
+	if (ec_cmd_battery_get_dynamic(PLAT_EC, &params, &resp) != 0)
+		return -1;
+
+	if (resp.full_capacity <= 0)
+		return -1;
+
+	uint32_t soc = (uint32_t)resp.remaining_capacity * 100 / (uint32_t)resp.full_capacity;
+
+	/* Clamp the value to 100% (some fuel gauges report slight overflows) */
+	if (soc > 100)
+		soc = 100;
+
+	*state = soc;
+
+	return 0;
+}
+
+/*
+ * Reads the current battery charge percentage.
+ *
+ * This function communicates with the Embedded Controller (EC) via a host
+ * command to retrieve the "State of Charge" (SoC) as calculated by the battery fuel gauge.
+ *
+ * Return: 0 on success, -1 on failure (communication error or EC rejection).
+ * Return Value (state): Pointer to a uint32_t where the battery state of charge
+ * (0-100) will be stored.
+ */
+int google_chromeec_read_batt_state_of_charge(uint32_t *state)
+{
+	int ret;
+
+	if (CONFIG(EC_GOOGLE_CHROMEEC_BATTERY_SOC_DYNAMIC))
+		ret = google_chromeec_read_batt_state_of_charge_raw(state);
+	else
+		ret = google_chromeec_read_batt_state_of_charge_cmd(state);
+
+	return ret;
 }

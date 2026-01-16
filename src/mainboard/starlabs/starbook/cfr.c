@@ -5,7 +5,7 @@
 #include <drivers/option/cfr_frontend.h>
 #include <ec/starlabs/merlin/cfr.h>
 #include <intelblocks/cfr.h>
-#include "cfr.h"
+#include <common/cfr.h>
 
 static struct sm_obj_form performance = {
 	.ui_name = "Performance",
@@ -38,6 +38,8 @@ static struct sm_obj_form power = {
 		#if CONFIG(EC_STARLABS_CHARGING_SPEED)
 		&charging_speed,
 		#endif
+		&power_led,
+		&charge_led,
 		&power_on_after_fail_bool,
 		NULL
 	},
@@ -55,6 +57,7 @@ static struct sm_obj_form keyboard = {
 static struct sm_obj_form devices = {
 	.ui_name = "Devices",
 	.obj_list = (const struct sm_object *[]) {
+		&bluetooth,
 		&card_reader,
 		#if CONFIG(BOARD_USES_FIXED_MODE_VBT)
 		&display_native_res,
@@ -76,7 +79,7 @@ static struct sm_obj_form devices = {
 		&vpu,
 		#endif
 		&webcam,
-		&wireless,
+		&wifi,
 		NULL
 	},
 };
@@ -89,9 +92,10 @@ static struct sm_obj_form pci = {
 		#endif
 		#if CONFIG(SOC_INTEL_COMMON_BLOCK_ASPM)
 		&pciexp_clk_pm,
-		&pciexp_aspm,
-		#if CONFIG(HAS_INTEL_CPU_ROOT_PORTS)
+		#if CONFIG(BOARD_STARLABS_STARBOOK_RPL)
 		&pciexp_aspm_cpu,
+		#else
+		&pciexp_aspm,
 		#endif
 		&pciexp_l1ss,
 		#endif

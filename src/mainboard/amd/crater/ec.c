@@ -9,7 +9,6 @@
 #define CRATER_EC_CMD	0x666
 #define CRATER_EC_DATA	0x662
 
-#define ENABLE_M2_SSD1  1
 #define EC_GPIO_0_ADDR		0xA0
 #define   EC_EVAL_PWREN	BIT(0)
 
@@ -31,8 +30,10 @@
 #define   EC4_TBT_PWREN		BIT(0)
 
 #define EC_GPIO_7_ADDR		0xA7
+#define   EC7_DT_WLAN_EN	BIT(6)
 #define   EC7_SSD_HDD_SW	BIT(5)
 #define   EC7_ODD_SSD_SW	BIT(4)
+#define   EC7_DT_WLAN_SW	BIT(3)
 #define   EC7_CAM1_EN		BIT(0)
 
 #define EC_GPIO_8_ADDR		0xA8
@@ -103,14 +104,14 @@
 #define   ECG_WLAN_WWAN_MUX_OFF	BIT(4)
 
 #define ECRAM_BOARDID_OFFSET 0x93
-#define CRATER_REVB    0x42
+#define ECRAM_MACID_OFFSET 0x54
+#define MACID_LEN 12
 
 static void configure_ec_gpio(void)
 {
 	uint8_t tmp;
 
 	tmp = ec_read(EC_GPIO_2_ADDR);
-	printk(BIOS_SPEW, "A2: Write reg [0x%02x] = 0x%02x\n", EC_GPIO_2_ADDR, tmp);
 	if (CONFIG(ENABLE_EVAL_CARD)) {
 		tmp |= EC2_EVAL_SLOT_PWREN;
 		if (CONFIG(ENABLE_EVAL_19V)) {
@@ -122,22 +123,45 @@ static void configure_ec_gpio(void)
 		tmp &= ~EC2_EVAL_SLOT_PWREN;
 		tmp &= ~EC2_EVAL_19V_EN;
 	}
+
+	if (CONFIG(PCIE_DT_SLOT))
+		tmp |= EC2_DT_PWREN;
+
 	printk(BIOS_SPEW, "Write reg [0x%02x] = 0x%02x\n", EC_GPIO_2_ADDR, tmp);
 	ec_write(EC_GPIO_2_ADDR, tmp);
 
+	tmp = ec_read(EC_GPIO_3_ADDR);
+	tmp |= EC3_WLAN_RST_AUX | EC3_WWAN_RST_AUX | EC3_SD_RST_AUX;
+	tmp |= EC3_DT_RST | EC3_LOM_RST_AUX | EC3_EVAL_RST_AUX | EC3_TBT_RST;
+	printk(BIOS_SPEW, "Write reg [0x%02x] = 0x%02x\n", EC_GPIO_3_ADDR, tmp);
+	ec_write(EC_GPIO_3_ADDR, tmp);
+
+	//TBT pwr EN (GPP 4~7)
+	tmp = ec_read(EC_GPIO_4_ADDR);
+	tmp |= EC4_TBT_PWREN;
+	printk(BIOS_SPEW, "Write reg [0x%02x] = 0x%02x\n", EC_GPIO_4_ADDR, tmp);
+	ec_write(EC_GPIO_4_ADDR, tmp);
+
 	tmp = ec_read(EC_GPIO_7_ADDR);
-	printk(BIOS_SPEW, "A7: Write reg [0x%02x] = 0x%02x\n", EC_GPIO_7_ADDR, tmp);
-	if (CONFIG(ENABLE_M2_SSD1)) {
+	if (CONFIG(ENABLE_M2_SSD)) {
 		tmp |= (EC7_ODD_SSD_SW | EC7_SSD_HDD_SW);
 	} else {
 		tmp &= ~(EC7_ODD_SSD_SW | EC7_SSD_HDD_SW);
 	}
+
+	if (CONFIG(PCIE_DT_SLOT)) {
+		tmp &= ~(EC7_DT_WLAN_SW);
+		tmp |= EC7_DT_WLAN_EN;
+	} else { // XGBE_WWAN_WLAN
+		tmp &= ~(EC7_DT_WLAN_EN);
+		tmp |= EC7_DT_WLAN_SW;
+	}
+
 	printk(BIOS_SPEW, "Write reg [0x%02x] = 0x%02x\n", EC_GPIO_7_ADDR, tmp);
 	ec_write(EC_GPIO_7_ADDR, tmp);
 
 	tmp = ec_read(EC_GPIO_8_ADDR);
-	printk(BIOS_SPEW, "A8: Write reg [0x%02x] = 0x%02x\n", EC_GPIO_8_ADDR, tmp);
-	if (CONFIG(ENABLE_M2_SSD1)) {
+	if (CONFIG(ENABLE_M2_SSD)) {
 		tmp |= EC8_M2SSD_PWREN;
 	} else {
 		tmp &= ~EC8_M2SSD_PWREN;
@@ -160,30 +184,48 @@ static void configure_ec_gpio(void)
 	}
 }
 
-static const struct soc_amd_gpio RevA_gpio_set_stage_ram[] = {
-	/* PCIE x8 SLOT*/
-	PAD_GPO(GPIO_4, HIGH),
-};
-
-static const struct soc_amd_gpio RevB_gpio_set_stage_ram[] = {
-	PAD_GPI(GPIO_4, PULL_UP),
-	PAD_GPO(GPIO_12, LOW),
-};
-
-void crater_boardrevision(void)
-{
-	uint8_t BoardRev;
-	BoardRev = ec_read(ECRAM_BOARDID_OFFSET + 0x3);
-
-	if (BoardRev == CRATER_REVB)
-		gpio_configure_pads(RevB_gpio_set_stage_ram, ARRAY_SIZE(RevB_gpio_set_stage_ram));
-	else
-		gpio_configure_pads(RevA_gpio_set_stage_ram, ARRAY_SIZE(RevA_gpio_set_stage_ram));
-}
-
 void crater_ec_init(void)
 {
 	ec_set_ports(CRATER_EC_CMD, CRATER_EC_DATA);
-	crater_boardrevision();
 	configure_ec_gpio();
+}
+
+uint8_t crater_ec_get_board_revision(void)
+{
+	static uint8_t board_rev;
+
+	if (board_rev)
+		return board_rev;
+
+	ec_set_ports(CRATER_EC_CMD, CRATER_EC_DATA);
+	board_rev = ec_read(ECRAM_BOARDID_OFFSET + 0x3);
+
+	return board_rev;
+}
+
+void crater_ec_get_mac_addresses(uint64_t *xgbe_port0_mac, uint64_t *xgbe_port1_mac)
+{
+	uint64_t port0_mac = 0;
+	uint64_t port1_mac = 0;
+	uint8_t value = 0;
+	uint8_t index = 0;
+	uint8_t offset = ECRAM_MACID_OFFSET;
+
+	ec_set_ports(CRATER_EC_CMD, CRATER_EC_DATA);
+	for (index = 0; index < MACID_LEN; index++) {
+		value = ec_read(offset + index);
+		printk(BIOS_SPEW, "READ MACID REG 0x%2x Value 0x%02x\n", offset - index, value);
+
+		if (index < 6) {
+			port0_mac = (port0_mac << 8) | value;
+		} else {
+			port1_mac = (port1_mac << 8) | value;
+		}
+	}
+
+	printk(BIOS_SPEW, "MAC Address XGBE port0: 0x%02llx\n", port0_mac);
+	printk(BIOS_SPEW, "MAC Address XGBE port1: 0x%02llx\n", port1_mac);
+
+	*xgbe_port0_mac = port0_mac;
+	*xgbe_port1_mac = port1_mac;
 }

@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 
+#include <acpi/acpi_apei.h>
 #include <bootstate.h>
 #include <cbmem.h>
 #include <console/console.h>
@@ -191,6 +192,11 @@ static size_t sizeof_error_section(guid_t *guid)
 	else if (!guidcmp(guid, &CPER_SEC_FW_ERR_REC_REF_GUID))
 		return sizeof(cper_fw_err_rec_section_t);
 	/* else if ... sizeof(structures not yet defined) */
+	else if (CONFIG(SOC_BERT_SIZEOF_ERROR_SECTION)) {
+		size_t size = soc_bert_sizeof_error_section(guid);
+		if (size)
+			return size;
+	}
 
 	printk(BIOS_ERR, "Requested size of unrecognized CPER GUID\n");
 	return 0;
@@ -323,14 +329,14 @@ acpi_hest_generic_data_v300_t *bert_append_genproc(
  *   CPER_IA32X64_CTX_32BIT_DBG
  *   CPER_IA32X64_CTX_64BIT_DBG
  *   CPER_IA32X64_CTX_MEMMAPPED
- * num is the number of bytes eventually used to fill the context's register
+ * array_size_bytes is the size (in bytes) eventually used to fill the context's register
  *   array, e.g. 4 MSRs * sizeof(msr_t)
  *
  * status and entry data_length values are updated.
  */
 cper_ia32x64_context_t *new_cper_ia32x64_ctx(
 		acpi_generic_error_status_t *status,
-		cper_ia32x64_proc_error_section_t *x86err, int type, int num)
+		cper_ia32x64_proc_error_section_t *x86err, int type, int array_size_bytes)
 {
 	size_t size;
 	cper_ia32x64_context_t *ctx;
@@ -354,7 +360,7 @@ cper_ia32x64_context_t *new_cper_ia32x64_ctx(
 		return NULL;
 	}
 
-	size = cper_ia32x64_ctx_sz_bytype(type, num);
+	size = cper_ia32x64_ctx_sz_bytype(type, array_size_bytes);
 	ctx = bert_allocate_storage(size);
 	if (!ctx) {
 		printk(BIOS_ERR, "New IA32X64 %s context entry would exceed available region\n",
@@ -365,7 +371,7 @@ cper_ia32x64_context_t *new_cper_ia32x64_ctx(
 	revise_error_sizes(status, size);
 
 	ctx->type = type;
-	ctx->array_size = num;
+	ctx->array_size = array_size_bytes;
 	cper_bump_ia32x64_ctx_count(x86err);
 
 	return ctx;
@@ -385,7 +391,7 @@ cper_ia32x64_proc_error_info_t *new_cper_ia32x64_check(
 		cper_ia32x64_proc_error_section_t *x86err,
 		enum cper_x86_check_type type)
 {
-	cper_ia32x64_proc_error_info_t *check;
+	cper_ia32x64_proc_error_info_t *proc_err_info;
 	static const char * const check_names[] = {
 			"cache",
 			"TLB",
@@ -408,19 +414,19 @@ cper_ia32x64_proc_error_info_t *new_cper_ia32x64_check(
 		return NULL;
 	}
 
-	check = bert_allocate_storage(sizeof(*check));
-	if (!check) {
+	proc_err_info = bert_allocate_storage(sizeof(*proc_err_info));
+	if (!proc_err_info) {
 		printk(BIOS_ERR, "New IA32X64 %s check entry would exceed available region\n",
 				check_names[type]);
 		return NULL;
 	}
 
-	revise_error_sizes(status, sizeof(*check));
+	revise_error_sizes(status, sizeof(*proc_err_info));
 
-	guidcpy(&check->type, &check_guids[type]);
+	guidcpy(&proc_err_info->type, &check_guids[type]);
 	cper_bump_ia32x64_chk_count(x86err);
 
-	return check;
+	return proc_err_info;
 }
 
 /* Helper to append an ACPI Generic Error Data Entry plus a CPER IA32/X64
@@ -512,10 +518,10 @@ acpi_generic_error_status_t *bert_new_event(guid_t *guid)
 {
 	size_t size;
 	acpi_generic_error_status_t *status;
-	acpi_hest_generic_data_v300_t *entry, *r;
+	acpi_hest_generic_data_v300_t *r;
 
 	size = sizeof(*status);
-	size += sizeof(*entry);
+	size += sizeof(*r);
 	size += sizeof_error_section(guid);
 
 	if (size > bert_storage_remaining()) {
@@ -530,13 +536,12 @@ acpi_generic_error_status_t *bert_new_event(guid_t *guid)
 
 	if (!guidcmp(guid, &CPER_SEC_PROC_GENERIC_GUID))
 		r = bert_append_genproc(status);
-	else if (!guidcmp(guid, &CPER_SEC_PROC_GENERIC_GUID))
+	else if (!guidcmp(guid, &CPER_SEC_PROC_IA32X64_GUID))
 		r = bert_append_ia32x64(status);
 	else if (!guidcmp(guid, &CPER_SEC_FW_ERR_REC_REF_GUID))
 		r = bert_append_fw_err(status);
-	/* else if other types not implemented */
 	else
-		r = NULL;
+		r = bert_append_error_datasection(status, guid);
 
 	if (r)
 		return status;
@@ -549,20 +554,21 @@ cper_ia32x64_context_t *cper_new_ia32x64_context_msr(
 		cper_ia32x64_proc_error_section_t *x86err, u32 addr, int num)
 {
 	cper_ia32x64_context_t *ctx;
-	int i;
-	msr_t *dest;
 
-	ctx = new_cper_ia32x64_ctx(status, x86err, CPER_IA32X64_CTX_MSR, num);
+	ctx = new_cper_ia32x64_ctx(status, x86err, CPER_IA32X64_CTX_MSR, num * sizeof(msr_t));
 	if (!ctx)
 		return NULL;
 
-	/* already filled ctx->type = CPER_IA32X64_CTX_MSR; */
+	/*
+	 * already filled:
+	 *   - ctx->type = CPER_IA32X64_CTX_MSR
+	 *   - ctx->array_size = num * sizeof(msr_t)
+	 */
 	ctx->msr_addr = addr;
-	ctx->array_size = num * sizeof(msr_t);
 
-	dest = (msr_t *)((u8 *)(ctx + 1)); /* point to the Register Array */
+	msr_t *dest = (msr_t *)(ctx->register_array); /* point to the Register Array */
 
-	for (i = 0 ; i < num ; i++)
+	for (int i = 0 ; i < num ; i++)
 		*(dest + i) = rdmsr(addr + i);
 	return ctx;
 }

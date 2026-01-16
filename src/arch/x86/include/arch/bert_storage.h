@@ -4,6 +4,7 @@
 #define _BERT_STORAGE_H_
 
 #include <acpi/acpi.h>
+#include <acpi/acpi_apei.h>
 #include <types.h>
 
 /* Items in the BERT region
@@ -49,6 +50,9 @@
  */
 void bert_errors_region(void **start, size_t *size);
 
+/* Returns the size for SoC specific GUIDs */
+size_t soc_bert_sizeof_error_section(guid_t *guid);
+
 /* Get amount of available storage left for error info */
 size_t bert_storage_remaining(void);
 /* Find if errors were added, a BERT region is present, and ACPI table needed */
@@ -90,7 +94,7 @@ static inline acpi_hest_generic_data_v300_t *acpi_hest_generic_data3(
 /* Add a context to an existing IA32/X64-type error entry */
 cper_ia32x64_context_t *new_cper_ia32x64_ctx(
 		acpi_generic_error_status_t *status,
-		cper_ia32x64_proc_error_section_t *x86err, int type, int num);
+		cper_ia32x64_proc_error_section_t *x86err, int type, int array_size);
 
 /* Helper to add an MSR context to an existing IA32/X64-type error entry */
 cper_ia32x64_context_t *cper_new_ia32x64_context_msr(

@@ -1,6 +1,6 @@
 ## SPDX-License-Identifier: GPL-2.0-only
 
-comment "Gru"
+comment "Gru (Rockchip RK3399)"
 
 config BOARD_GOOGLE_KEVIN
 	bool "->  Kevin (Samsung Chromebook Plus)"
@@ -12,7 +12,7 @@ config BOARD_GOOGLE_BOB
 	bool "->  Bob (Asus Chromebook Flip C101PA)"
 
 config BOARD_GOOGLE_SCARLET
-	bool "->  Scarlet"
+	bool "->  Scarlet (Acer Chromebook Tab 10)"
 
 config BOARD_GOOGLE_NEFARIO
 	bool "->  Nefario"

@@ -1,6 +1,6 @@
 ## SPDX-License-Identifier: GPL-2.0-only OR MIT
 
-comment "Skywalker"
+comment "Skywalker (MediaTek Kompanio 540 (MT8189))"
 
 config BOARD_GOOGLE_ANAKIN
 	bool "->  Anakin"
@@ -8,11 +8,29 @@ config BOARD_GOOGLE_ANAKIN
 config BOARD_GOOGLE_BAZE
 	bool "->  Baze"
 
+config BOARD_GOOGLE_DOOKU
+	bool "->  Dooku"
+
+config BOARD_GOOGLE_GROGU
+	bool "->  Grogu"
+
+config BOARD_GOOGLE_MACE
+	bool "->  Mace"
+
 config BOARD_GOOGLE_OBIWAN
 	bool "->  Obiwan"
+
+config BOARD_GOOGLE_PADME
+	bool "->  Padme"
 
 config BOARD_GOOGLE_SKYWALKER
 	bool "->  Skywalker"
 
+config BOARD_GOOGLE_TARKIN
+	bool "->  Tarkin"
+
+config BOARD_GOOGLE_VADER
+	bool "->  Vader"
+
 config BOARD_GOOGLE_YODA
-	bool "-> Yoda"
+	bool "->  Yoda"

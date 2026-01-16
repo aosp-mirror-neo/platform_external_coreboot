@@ -458,9 +458,17 @@ typedef struct {
 **/
   UINT8                       UfsEnable[2];
 
-/** Offset 0x014D - Reserved
+/** Offset 0x014D - UFS Inline Encryption enable/disable
+  Enable/Disable UFS Inline Encryption feature, One byte for each Controller - (1,0)
+  to enable Inline Encryption for controller 0 and (0, 1) to enable Inline Encryption
+  for controller 1
+  $EN_DIS
 **/
-  UINT8                       Reserved12[4];
+  UINT8                       UfsInlineEncryption[2];
+
+/** Offset 0x014F - Reserved
+**/
+  UINT8                       Reserved12[2];
 
 /** Offset 0x0151 - Enable/Disable PCIe tunneling for USB4
   Enable/Disable PCIe tunneling for USB4, default is enable
@@ -1667,7 +1675,9 @@ typedef struct {
 **/
   UINT16                      PchTemperatureHotLevel;
 
-/** Offset 0x1226
+/** Offset 0x1226 - Enable PCH TSN
+  Enable/disable TSN on the PCH.
+  $EN_DIS
 **/
   UINT8                       PchTsnEnable[4];
 
@@ -2024,9 +2034,15 @@ typedef struct {
 **/
   UINT8                       LidStatus;
 
-/** Offset 0x1401 - Reserved
+/** Offset 0x1401 - Select MaxActiveDisplays
+  Max Active Display : 0 - Default VBT, 1 - 1 display, 2 - 2 displays, Maximum supported
+  is 2 displays only
 **/
-  UINT8                       Reserved50[67];
+  UINT8                       MaxActiveDisplays;
+
+/** Offset 0x1402 - Reserved
+**/
+  UINT8                       Reserved50[66];
 
 /** Offset 0x1444 - Address of PCH_DEVICE_INTERRUPT_CONFIG table.
   The address of the table of PCH_DEVICE_INTERRUPT_CONFIG.
@@ -2335,9 +2351,17 @@ typedef struct {
 **/
   UINT8                       PchHdaLinkFrequency;
 
-/** Offset 0x149B - Reserved
+/** Offset 0x149B - HD Audio Microphone Privacy Mode
+  HD Audio Microphone Privacy Mode: 0: No Microphone Privacy Support; 1: HW Managed
+  Microphone Privacy; 2: FW Managed Microphone Privacy; 3: Force Microphone Mute
+  0: No Microphone Privacy Support, 1: HW Managed Microphone Privacy, 2: FW Managed
+  Microphone Privacy, 3: Force Microphone Mute
 **/
-  UINT8                       Reserved59[2];
+  UINT8                       PchHdaMicPrivacyMode;
+
+/** Offset 0x149C - Reserved
+**/
+  UINT8                       Reserved59;
 
 /** Offset 0x149D - HD Audio Microphone Privacy applied for SoundWire Link number 0 in HW Mode
   HD Audio Microphone Privacy applied for SoundWire Link number 0 in HW Mode: 0: Disable, 1: Enable

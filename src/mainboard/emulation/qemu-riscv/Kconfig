@@ -37,6 +37,9 @@ config BOARD_SPECIFIC_OPTIONS
 	select ARCH_RAMSTAGE_RISCV
 	select RISCV_USE_ARCH_TIMER
 	select FLATTENED_DEVICE_TREE
+	select DRIVERS_EMULATION_QEMU_FW_CFG
+	select PCI
+	select HAVE_ACPI_TABLES
 
 config MEMLAYOUT_LD_FILE
 	string
@@ -47,6 +50,12 @@ config MAINBOARD_DIR
 
 config MAINBOARD_PART_NUMBER
 	default "QEMU RISCV"
+
+config ECAM_MMCONF_BASE_ADDRESS
+	default 0x30000000
+
+config ECAM_MMCONF_BUS_NUMBER
+	default 256
 
 config MAX_CPUS
 	int
@@ -78,5 +87,9 @@ config OPENSBI_PLATFORM
 config OPENSBI_TEXT_START
 	hex
 	default 0x80020000
+
+config PCI_IOBASE
+	hex
+	default 0x3000000
 
 endif #  BOARD_EMULATION_QEMU_RISCV

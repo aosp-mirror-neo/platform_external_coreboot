@@ -8,6 +8,7 @@
 #include <static.h>
 #include <types.h>
 #include <variants.h>
+#include <common/powercap.h>
 
 #define TJ_MAX		110
 #define TCC(temp)	(TJ_MAX - temp)
@@ -50,7 +51,7 @@ void devtree_update(void)
 	soc_conf_20core->tdp_pl2_override = (soc_conf_20core->tdp_pl2_override * performance_scale) / 100;
 
 	/* Enable/Disable Bluetooth based on CMOS settings */
-	if (get_uint_option("wireless", 1) == 0)
+	if (get_uint_option("bluetooth", 1) == 0)
 		cfg->usb2_ports[9].enable = 0;
 
 	/* Enable/Disable Webcam based on CMOS settings */
@@ -59,7 +60,7 @@ void devtree_update(void)
 
 	/* Enable/Disable Card Reader based on CMOS Settings */
 	if (get_uint_option("card_reader", 1) == 0)
-		cfg->usb2_ports[3].enable = 0;
+		cfg->usb2_ports[7].enable = 0;
 
 	/* Enable/Disable GNA based on CMOS settings */
 	if (get_uint_option("gna", 0) == 0)
