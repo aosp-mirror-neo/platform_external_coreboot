@@ -154,8 +154,8 @@ ramstage-$(CONFIG_BOOTSPLASH) += jpeg.c
 ramstage-$(CONFIG_COLLECT_TIMESTAMPS) += timestamp.c
 ramstage-$(CONFIG_COVERAGE) += libgcov.c
 ramstage-y += dp_aux.c
+ramstage-y += framebuffer_info.c
 ramstage-y += edid.c
-ramstage-y += edid_fill_fb.c
 ramstage-y += memrange.c
 ramstage-$(CONFIG_GENERIC_GPIO_LIB) += gpio.c
 ramstage-$(CONFIG_GENERIC_UDELAY) += timer.c
@@ -163,6 +163,9 @@ ramstage-y += b64_decode.c
 ramstage-$(CONFIG_ACPI_NHLT) += nhlt.c
 ramstage-$(CONFIG_PAYLOAD_FIT_SUPPORT) += fit.c
 ramstage-$(CONFIG_PAYLOAD_FIT_SUPPORT) += fit_payload.c
+
+ramstage-$(CONFIG_VGA) += vga_gfx.c
+romstage-$(CONFIG_ROMSTAGE_VGA) += vga_gfx.c
 
 romstage-$(CONFIG_TIMER_QUEUE) += timer_queue.c
 ramstage-$(CONFIG_TIMER_QUEUE) += timer_queue.c
@@ -271,9 +274,6 @@ romstage-y += crc_byte.c
 postcar-y += crc_byte.c
 ramstage-y += crc_byte.c
 smm-y += crc_byte.c
-
-romstage-y += xxhash.c
-ramstage-y += xxhash.c
 
 postcar-y += bootmode.c
 postcar-y += boot_device.c
@@ -442,8 +442,7 @@ $(2)-compression := $$(BMP_LOGO_COMPRESS_FLAG)
 endef
 
 ifneq ($(CONFIG_HAVE_CUSTOM_BMP_LOGO),y)
-$(eval $(call add_bmp_logo_file_to_cbfs,CONFIG_BMP_LOGO, logo.bmp,\
-	      CONFIG_BMP_LOGO_FILE_NAME))
+$(eval $(call add_bmp_logo_file_to_cbfs,CONFIG_BMP_LOGO,logo.bmp,CONFIG_BMP_LOGO_FILE_NAME))
 endif
 
 $(eval $(call add_bmp_logo_file_to_cbfs,CONFIG_PLATFORM_HAS_LOW_BATTERY_INDICATOR, \

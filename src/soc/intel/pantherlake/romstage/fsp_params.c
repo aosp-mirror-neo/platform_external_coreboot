@@ -14,6 +14,7 @@
 #include <soc/msr.h>
 #include <soc/pcie.h>
 #include <soc/romstage.h>
+#include <tdp.h>
 #include <static.h>
 
 #include "ux.h"
@@ -50,8 +51,8 @@ static void fill_fspm_igd_params(FSP_M_CONFIG *m_cfg,
 			*ddi_port_upds[i].hpd = !!(config->ddi_ports_config[i] &
 						   DDI_ENABLE_HPD);
 		}
-		/* Disable memory bandwidth compression */
-		m_cfg->MemoryBandwidthCompression = 0;
+		/* Enable memory bandwidth compression */
+		m_cfg->MemoryBandwidthCompression = 1;
 	} else {
 		/* IGD is disabled, skip IGD init in FSP. */
 		m_cfg->IgdDvmt50PreAlloc = 0;
@@ -196,6 +197,15 @@ static void fill_fspm_audio_params(FSP_M_CONFIG *m_cfg,
 	memset(m_cfg->PchHdaAudioLinkDmicEnable, 0, sizeof(m_cfg->PchHdaAudioLinkDmicEnable));
 	memset(m_cfg->PchHdaAudioLinkSspEnable, 0, sizeof(m_cfg->PchHdaAudioLinkSspEnable));
 	memset(m_cfg->PchHdaAudioLinkSndwEnable, 0, sizeof(m_cfg->PchHdaAudioLinkSndwEnable));
+
+	/*
+	 * Get HDA Subsystem Vendor ID and Device ID from devicetree
+	 * and set it in FSPM UPD.
+	 */
+	const struct device_path path = { .type = DEVICE_PATH_PCI, .pci.devfn = PCI_DEVFN_HDA };
+	const struct device *dev = find_dev_path(pci_root_bus(), &path);
+	if (is_dev_enabled(dev) && dev->subsystem_vendor && dev->subsystem_device)
+		m_cfg->PchHdaSubSystemIds = dev->subsystem_vendor | (dev->subsystem_device << 16);
 }
 
 static void pcie_rp_init(FSP_M_CONFIG *m_cfg, uint32_t en_mask,
@@ -312,7 +322,7 @@ static const struct soc_intel_pantherlake_power_map *get_map(const struct soc_in
 		return NULL;
 	}
 
-	uint8_t tdp = get_cpu_tdp();
+	enum soc_intel_pantherlake_cpu_tdps tdp = soc_get_cpu_tdp();
 	for (size_t i = 0; i < ARRAY_SIZE(cpuid_to_ptl); i++) {
 		const struct soc_intel_pantherlake_power_map *current = &cpuid_to_ptl[i];
 		if (current->cpu_id == sa_pci_id && current->cpu_tdp == tdp)
@@ -341,10 +351,30 @@ static void fill_fspm_vr_config_params(FSP_M_CONFIG *m_cfg,
 	}
 
 	for (size_t i = 0; i < ARRAY_SIZE(config->thermal_design_current[0]); i++) {
-		if (!config->thermal_design_current[map->sku][i])
+		if (!config->thermal_design_current[map->tdc][i])
 			continue;
 		m_cfg->TdcEnable[i] = 1;
-		m_cfg->TdcCurrentLimit[i] = config->thermal_design_current[map->sku][i];
+		m_cfg->TdcCurrentLimit[i] = config->thermal_design_current[map->tdc][i];
+	}
+
+	for (size_t i = 0; i < ARRAY_SIZE(config->icc_max[0]); i++) {
+		if (!config->icc_max[map->sku][i])
+			continue;
+		m_cfg->IccMax[i] = config->icc_max[map->sku][i];
+	}
+
+	for (size_t i = 0; i < ARRAY_SIZE(config->tdc_mode); i++) {
+		m_cfg->TdcMode[i] = config->tdc_mode[i];
+		m_cfg->TdcTimeWindow[i] = config->tdc_time_window_ms[i];
+	}
+
+	for (size_t i = 0; i < ARRAY_SIZE(config->ps1_threshold); i++) {
+		if (config->ps1_threshold[i])
+			m_cfg->Ps1Threshold[i] = config->ps1_threshold[i];
+		if (config->ps2_threshold[i])
+			m_cfg->Ps2Threshold[i] = config->ps2_threshold[i];
+		if (config->ps3_threshold[i])
+			m_cfg->Ps3Threshold[i] = config->ps3_threshold[i];
 	}
 }
 
@@ -355,6 +385,22 @@ void platform_display_early_shutdown_notification(void *arg)
 	ux_inform_user_of_poweroff_operation("low-battery shutdown", mupd);
 }
 #endif
+
+static void fill_fspm_acoustic_params(FSP_M_CONFIG *m_cfg,
+				      const struct soc_intel_pantherlake_config *config)
+{
+	if (!config->enable_acoustic_noise_mitigation)
+		return;
+
+	m_cfg->AcousticNoiseMitigation = config->enable_acoustic_noise_mitigation;
+	m_cfg->PcoreHysteresisWindow = config->pcore_hysteresis_window_ms;
+	m_cfg->EcoreHysteresisWindow = config->ecore_hysteresis_window_ms;
+
+	for (size_t i = 0; i < ARRAY_SIZE(config->disable_fast_pkgc_ramp); i++) {
+		m_cfg->FastPkgCRampDisable[i] = config->disable_fast_pkgc_ramp[i];
+		m_cfg->SlowSlewRate[i] = config->slow_slew_rate_config[i];
+	}
+}
 
 static void soc_memory_init_params(FSP_M_CONFIG *m_cfg,
 				   const struct soc_intel_pantherlake_config *config)
@@ -377,6 +423,7 @@ static void soc_memory_init_params(FSP_M_CONFIG *m_cfg,
 		fill_fspm_trace_params,
 		fill_fspm_thermal_params,
 		fill_fspm_vr_config_params,
+		fill_fspm_acoustic_params,
 	};
 
 	for (size_t i = 0; i < ARRAY_SIZE(fill_fspm_params); i++)

@@ -59,6 +59,15 @@ void clock_reset_bcr(void *bcr_addr, bool assert)
 		clrbits32(bcr_addr, BIT(CLK_CTL_BCR_BLK_SHFT));
 }
 
+/* Clock Reset Operations */
+void clock_reset(void *cbcr_addr, bool assert)
+{
+	if (assert)
+		setbits32(cbcr_addr, BIT(CLK_CTL_ARES_SHFT));
+	else
+		clrbits32(cbcr_addr, BIT(CLK_CTL_ARES_SHFT));
+}
+
 /* Clock GDSC Operations */
 enum cb_err enable_and_poll_gdsc_status(void *gdscr_addr)
 {
@@ -282,6 +291,26 @@ enum cb_err zondaole_pll_enable(struct alpha_pll_reg_val_config *cfg)
 	udelay(1);
 	setbits32(cfg->reg_mode, BIT(PLL_RESET_SHFT));
 	setbits32(cfg->reg_opmode, PLL_RUN_MODE);
+
+	if (!wait_us(100, read32(cfg->reg_mode) & PLL_LOCK_DET_BMSK)) {
+		printk(BIOS_ERR, "CPU PLL did not lock!\n");
+		return CB_ERR;
+	}
+
+	setbits32(cfg->reg_mode, BIT(PLL_OUTCTRL_SHFT));
+
+	return CB_SUCCESS;
+}
+
+enum cb_err lucidole_pll_enable(struct alpha_pll_reg_val_config *cfg)
+{
+	/*
+	 * H/W requires a 1us delay between disabling the bypass and
+	 * de-asserting the reset.
+	 */
+	udelay(1);
+	setbits32(cfg->reg_opmode, PLL_RUN_MODE);
+	setbits32(cfg->reg_mode, BIT(PLL_RESET_SHFT));
 
 	if (!wait_us(100, read32(cfg->reg_mode) & PLL_LOCK_DET_BMSK)) {
 		printk(BIOS_ERR, "CPU PLL did not lock!\n");

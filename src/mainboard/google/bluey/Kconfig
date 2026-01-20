@@ -4,28 +4,61 @@ config BOARD_GOOGLE_BLUEY_COMMON
 	def_bool n
 	select COMMON_CBFS_SPI_WRAPPER
 	select MAINBOARD_HAS_CHROMEOS
-	select SOC_QUALCOMM_X1P42100
 	select SPI_FLASH
 	select SPI_FLASH_FORCE_4_BYTE_ADDR_MODE
+	select SPI_FLASH_INCLUDE_ALL_DRIVERS
 
 config BOARD_GOOGLE_BASEBOARD_BLUEY
 	def_bool n
 	select BOARD_GOOGLE_BLUEY_COMMON
 
-config BOARD_GOOGLE_BLUEY
+config BOARD_GOOGLE_MODEL_BLUEY
+	def_bool n
 	select BOARD_GOOGLE_BASEBOARD_BLUEY
 	select BOARD_ROMSIZE_KB_65536
 	select MAINBOARD_HAS_FINGERPRINT_VIA_USB
 	select MISSING_BOARD_RESET
-	select SPI_FLASH_MACRONIX
 
-config BOARD_GOOGLE_QUENBI
+config BOARD_GOOGLE_BLUEY
+	select BOARD_GOOGLE_MODEL_BLUEY
+	select SOC_QUALCOMM_X1P42100
+
+config BOARD_GOOGLE_BLUEYH
+	select BOARD_GOOGLE_MODEL_BLUEY
+	select SOC_QUALCOMM_HAMOA
+
+config BOARD_GOOGLE_MODEL_QUENBI
+	def_bool n
 	select BOARD_GOOGLE_BASEBOARD_BLUEY
 	select BOARD_ROMSIZE_KB_32768
+	select EC_GOOGLE_CHROMEEC_BATTERY_SOC_DYNAMIC
 	select MAINBOARD_HAS_CHROME_EC
 	select MAINBOARD_HAS_FINGERPRINT_VIA_SPI
 	select MAINBOARD_HAS_GOOGLE_TPM
-	select SPI_FLASH_WINBOND
+
+config BOARD_GOOGLE_MODEL_QUARTZ
+	def_bool n
+	select BOARD_GOOGLE_BASEBOARD_BLUEY
+	select BOARD_ROMSIZE_KB_32768
+	select EC_GOOGLE_CHROMEEC_BATTERY_SOC_DYNAMIC
+	select MAINBOARD_HAS_CHROME_EC
+	select MAINBOARD_HAS_FINGERPRINT_VIA_SPI
+	select MAINBOARD_HAS_GOOGLE_TPM
+
+config BOARD_GOOGLE_QUENBI
+	select BOARD_GOOGLE_MODEL_QUENBI
+	select SOC_QUALCOMM_X1P42100
+
+config BOARD_GOOGLE_QUENBIH
+	select BOARD_GOOGLE_MODEL_QUENBI
+	select SOC_QUALCOMM_HAMOA
+
+config BOARD_GOOGLE_QUARTZ
+	select BOARD_GOOGLE_MODEL_QUARTZ
+	select SOC_QUALCOMM_HAMOA
+	select MAINBOARD_HAS_PS8820_RETIMER
+	select MAINBOARD_NO_USB_A_PORT
+	select MAINBOARD_SUPPORTS_PARALLEL_CHARGING
 
 if BOARD_GOOGLE_BLUEY_COMMON
 
@@ -59,6 +92,24 @@ config MAINBOARD_HAS_SD_CONTROLLER
 	help
 	  Enable this option if your mainboard is equipped with SD card controller.
 
+config MAINBOARD_HAS_PS8820_RETIMER
+	bool
+	default n
+	help
+	  Enable this option if your mainboard is equipped with a PS8820 retimer.
+
+config MAINBOARD_NO_USB_A_PORT
+	bool
+	default n
+	help
+	  Enable this option if your mainboard is not equipped with USB-A port.
+
+config MAINBOARD_SUPPORTS_PARALLEL_CHARGING
+	bool
+	default n
+	help
+	  Enable this option if your mainboard supports parallel charging.
+
 config MAINBOARD_HAS_GOOGLE_TPM
 	bool
 	default n
@@ -84,7 +135,8 @@ config MAINBOARD_VENDOR
 	default "Google"
 
 config VBOOT
-	select VBOOT_NO_BOARD_SUPPORT if BOARD_GOOGLE_BLUEY
+	select VBOOT_ALWAYS_ENABLE_DISPLAY
+	select VBOOT_NO_BOARD_SUPPORT if BOARD_GOOGLE_MODEL_BLUEY
 	select VBOOT_VBNV_FLASH
 
 ##########################################################
@@ -92,13 +144,16 @@ config VBOOT
 ##########################################################
 
 config MAINBOARD_PART_NUMBER
-	default "Bluey" if BOARD_GOOGLE_BLUEY
+	default "Bluey" if BOARD_GOOGLE_MODEL_BLUEY
 	default "Quenbi" if BOARD_GOOGLE_QUENBI
+	default "QuenbiH" if BOARD_GOOGLE_QUENBIH
+	default "Quartz" if BOARD_GOOGLE_MODEL_QUARTZ
 
 config DRIVER_TPM_I2C_BUS
 	depends on I2C_TPM
 	hex
-	default 0xa if BOARD_GOOGLE_QUENBI
+	default 0xa if BOARD_GOOGLE_MODEL_QUENBI
+	default 0xa if BOARD_GOOGLE_MODEL_QUARTZ
 	default 0x10
 
 config DRIVER_TPM_I2C_ADDR
@@ -107,17 +162,31 @@ config DRIVER_TPM_I2C_ADDR
 config EC_GOOGLE_CHROMEEC_SPI_BUS
 	depends on EC_GOOGLE_CHROMEEC
 	hex
-	default 0xd if BOARD_GOOGLE_QUENBI
+	default 0xd if BOARD_GOOGLE_MODEL_QUENBI
+	default 0xd if BOARD_GOOGLE_MODEL_QUARTZ
 	default 0xb
+
+config MAINBOARD_GPIO_PIN_FOR_TOUCHPAD_POWER
+	int
+	default 36 if BOARD_GOOGLE_MODEL_QUARTZ
+	default 0
+	help
+	  This option specifies the GPIO pin number on the mainboard that is
+	  used for enabling power to the touchpad. Set it to 0 if unused.
 
 config MAINBOARD_GPIO_PIN_FOR_GSC_AP_INTERRUPT
 	depends on TPM_GOOGLE_TI50
 	int
-	default 91 if BOARD_GOOGLE_QUENBI
+	default 91 if BOARD_GOOGLE_MODEL_QUENBI
+	default 91 if BOARD_GOOGLE_MODEL_QUARTZ
 	default 34
 	help
 	  This option specifies the GPIO pin number on the mainboard that is
 	  used for the interrupt line from the Google Security Chip (GSC) to the
 	  Application Processor (AP).
+
+config FMDFILE
+	default "src/mainboard/\$(CONFIG_MAINBOARD_DIR)/chromeos-nogsc.fmd" if BOARD_GOOGLE_MODEL_BLUEY
+	default "src/mainboard/\$(CONFIG_MAINBOARD_DIR)/chromeos.fmd"
 
 endif # BOARD_GOOGLE_BLUEY_COMMON

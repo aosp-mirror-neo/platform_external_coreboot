@@ -50,6 +50,21 @@ void platform_fsp_silicon_init_params_cb(FSPS_UPD *supd);
 /* Callbacks for SoC/Mainboard specific overrides */
 void platform_fsp_memory_multi_phase_init_cb(uint32_t phase_index);
 void platform_fsp_silicon_multi_phase_init_cb(uint32_t phase_index);
+
+#if CONFIG(FSP_DIMM_INFO)
+struct dimm_fill_args {
+	uint16_t data_width;
+	uint16_t mfg_id_arg;
+};
+
+/* Retrieve DIMM Information by relying on the FSP */
+void fsp_save_dimm_info(void);
+/* Callbacks for SoC/Mainboard specific overrides */
+void platform_fill_dimm_info_args(const DIMM_INFO *src_dimm,
+	    const MEMORY_INFO_DATA_HOB *meminfo_hob,
+	    struct dimm_fill_args *args);
+#endif
+
 /*
  * Displays an early shutdown notification to the user.
  *
@@ -108,8 +123,16 @@ void soc_load_logo_by_fsp(FSPS_UPD *supd);
  */
 #if CONFIG(USE_COREBOOT_FOR_BMP_RENDERING)
 void soc_load_logo_by_coreboot(void);
+int soc_mark_gfx_memory(void);
 #else
 static inline void soc_load_logo_by_coreboot(void) { /* nop */ }
+static inline int soc_mark_gfx_memory(void) { return -1; }
+#endif
+
+#if CONFIG(FSP_VGA_MODE12)
+void soc_set_vga_mode12_buffer(FSPM_UPD *fspm_upd, uintptr_t buffer);
+#else
+static inline void soc_set_vga_mode12_buffer(FSPM_UPD *fspm_upd, uintptr_t buffer) { /* nop */ }
 #endif
 
 /* Update the SOC specific memory config param for mma. */

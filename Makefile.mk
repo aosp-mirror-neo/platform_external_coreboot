@@ -35,8 +35,9 @@ COREBOOT_EXPORTS += KERNELVERSION
 # Basic component discovery
 MAINBOARDDIR=$(call strip_quotes,$(CONFIG_MAINBOARD_DIR))
 VARIANT_DIR:=$(call strip_quotes,$(CONFIG_VARIANT_DIR))
+MB_COMMON_DIR := $(call strip_quotes,$(CONFIG_MB_COMMON_DIR))
 CARRIER_DIR:=$(call strip_quotes,$(CONFIG_CARRIER_DIR))
-COREBOOT_EXPORTS += MAINBOARDDIR VARIANT_DIR CARRIER_DIR
+COREBOOT_EXPORTS += MAINBOARDDIR VARIANT_DIR MB_COMMON_DIR CARRIER_DIR
 
 ## Final build results, which CBFSTOOL uses to create the final
 ## rom image file, are placed under $(objcbfs).
@@ -119,6 +120,9 @@ subdirs-y += util/futility util/marvell util/bincfg util/supermicro util/qemu
 subdirs-y += util/ifdtool
 subdirs-y += $(wildcard src/arch/*)
 subdirs-y += src/mainboard/$(MAINBOARDDIR)
+ifneq ($(MB_COMMON_DIR),)
+subdirs-y += src/mainboard/$(MB_COMMON_DIR)
+endif
 subdirs-y += src/security
 subdirs-y += payloads payloads/external
 subdirs-$(CONFIG_SBOM) += src/sbom
@@ -451,6 +455,8 @@ cbfs-files-handler= \
 CBFS_COMPRESS_FLAG:=none
 ifeq ($(CONFIG_COMPRESS_RAMSTAGE_LZMA),y)
 CBFS_COMPRESS_FLAG:=LZMA
+else ifeq ($(CONFIG_COMPRESS_RAMSTAGE_ZSTD),y)
+CBFS_COMPRESS_FLAG:=ZSTD
 endif
 ifeq ($(CONFIG_COMPRESS_RAMSTAGE_LZ4),y)
 CBFS_COMPRESS_FLAG:=LZ4
@@ -459,9 +465,10 @@ endif
 CBFS_PAYLOAD_COMPRESS_FLAG:=none
 ifeq ($(CONFIG_COMPRESSED_PAYLOAD_LZMA),y)
 CBFS_PAYLOAD_COMPRESS_FLAG:=LZMA
-endif
-ifeq ($(CONFIG_COMPRESSED_PAYLOAD_LZ4),y)
+else ifeq ($(CONFIG_COMPRESSED_PAYLOAD_LZ4),y)
 CBFS_PAYLOAD_COMPRESS_FLAG:=LZ4
+else ifeq ($(CONFIG_COMPRESSED_PAYLOAD_ZSTD),y)
+CBFS_PAYLOAD_COMPRESS_FLAG:=ZSTD
 endif
 
 CBFS_SECONDARY_PAYLOAD_COMPRESS_FLAG:=none
@@ -484,7 +491,6 @@ CPPFLAGS_common += -Isrc/include
 CPPFLAGS_common += -Isrc/commonlib/include
 CPPFLAGS_common += -Isrc/commonlib/bsd/include
 CPPFLAGS_common += -I$(obj)
-VBOOT_SOURCE ?= 3rdparty/vboot
 CPPFLAGS_common += -I$(VBOOT_SOURCE)/firmware/include
 CPPFLAGS_common += -include $(src)/include/kconfig.h
 CPPFLAGS_common += -include $(src)/include/rules.h
@@ -968,13 +974,25 @@ $(objcbfs)/%.elf: $(objcbfs)/%.debug $(objcbfs)/%.map
 # 4) replace all '*' characters with spaces
 extract_nth=$(subst *,$(spc),$(patsubst -%-,%,$(word $(1), $(subst |,- -,-$(2)-))))
 
+CBFS_REGIONS := COREBOOT
+
+ifeq ($(CONFIG_INTEL_ADD_TOP_SWAP_BOOTBLOCK),y)
+ifneq ($(CONFIG_INTEL_TOP_SWAP_SEPARATE_REGIONS),y)
+TS_OPTIONS := -j $(CONFIG_INTEL_TOP_SWAP_BOOTBLOCK_SIZE)
+else
+CBFS_REGIONS := COREBOOT,COREBOOT_TS
+endif
+endif
+
+CBFS_REGION_COUNT := $(words $(subst $(comma),$(spc),$(CBFS_REGIONS)))
+
 # regions-for-file - Returns a cbfstool regions parameter
 # $(call regions-for-file,$(filename))
 # returns "REGION1,REGION2,..."
 #
 # This is the default implementation. When using a boot strategy employing
 # multiple CBFSes in fmap regions, override it.
-regions-for-file ?= $(if $(value regions-for-file-$(1)), $(regions-for-file-$(1)), COREBOOT)
+regions-for-file ?= $(if $(value regions-for-file-$(1)), $(regions-for-file-$(1)), $(CBFS_REGIONS))
 
 ifeq ($(CONFIG_CBFS_AUTOGEN_ATTRIBUTES),y)
 	cbfs-autogen-attributes=-g
@@ -1109,7 +1127,7 @@ FMAP_CURRENT_BASE := 0
 ifeq ($(CONFIG_CONSOLE_SPI_FLASH),y)
 FMAP_CONSOLE_BASE := $(FMAP_CURRENT_BASE)
 FMAP_CONSOLE_SIZE := $(CONFIG_CONSOLE_SPI_FLASH_BUFFER_SIZE)
-FMAP_CONSOLE_ENTRY := CONSOLE@$(FMAP_CONSOLE_BASE) $(FMAP_CONSOLE_SIZE)
+FMAP_CONSOLE_ENTRY := CONSOLE@$(call _tohex,$(FMAP_CONSOLE_BASE)) $(call _tohex,$(FMAP_CONSOLE_SIZE))
 FMAP_CURRENT_BASE := $(call int-add, $(FMAP_CONSOLE_BASE) $(FMAP_CONSOLE_SIZE))
 else
 FMAP_CONSOLE_ENTRY :=
@@ -1118,7 +1136,7 @@ endif
 ifeq ($(CONFIG_CACHE_MRC_SETTINGS),y)
 FMAP_MRC_CACHE_BASE := $(call int-align, $(FMAP_CURRENT_BASE), 0x10000)
 FMAP_MRC_CACHE_SIZE := $(CONFIG_MRC_SETTINGS_CACHE_SIZE)
-FMAP_MRC_CACHE_ENTRY := RW_MRC_CACHE@$(FMAP_MRC_CACHE_BASE) $(FMAP_MRC_CACHE_SIZE)
+FMAP_MRC_CACHE_ENTRY := RW_MRC_CACHE@$(call _tohex,$(FMAP_MRC_CACHE_BASE)) $(call _tohex,$(FMAP_MRC_CACHE_SIZE))
 FMAP_CURRENT_BASE := $(call int-add, $(FMAP_MRC_CACHE_BASE) $(FMAP_MRC_CACHE_SIZE))
 else
 FMAP_MRC_CACHE_ENTRY :=
@@ -1127,7 +1145,7 @@ endif
 ifeq ($(CONFIG_SMMSTORE),y)
 FMAP_SMMSTORE_BASE := $(call int-align, $(FMAP_CURRENT_BASE), 0x10000)
 FMAP_SMMSTORE_SIZE := $(CONFIG_SMMSTORE_SIZE)
-FMAP_SMMSTORE_ENTRY := SMMSTORE@$(FMAP_SMMSTORE_BASE) $(FMAP_SMMSTORE_SIZE)
+FMAP_SMMSTORE_ENTRY := SMMSTORE@$(call _tohex,$(FMAP_SMMSTORE_BASE)) $(call _tohex,$(FMAP_SMMSTORE_SIZE))
 FMAP_CURRENT_BASE := $(call int-add, $(FMAP_SMMSTORE_BASE) $(FMAP_SMMSTORE_SIZE))
 else
 FMAP_SMMSTORE_ENTRY :=
@@ -1137,7 +1155,7 @@ ifeq ($(CONFIG_SPD_CACHE_IN_FMAP),y)
 FMAP_SPD_CACHE_BASE := $(call int-align, $(FMAP_CURRENT_BASE), 0x4000)
 FMAP_SPD_CACHE_SIZE := $(call int-multiply, $(CONFIG_DIMM_MAX) $(CONFIG_DIMM_SPD_SIZE))
 FMAP_SPD_CACHE_SIZE := $(call int-align, $(FMAP_SPD_CACHE_SIZE), 0x1000)
-FMAP_SPD_CACHE_ENTRY := $(CONFIG_SPD_CACHE_FMAP_NAME)@$(FMAP_SPD_CACHE_BASE) $(FMAP_SPD_CACHE_SIZE)
+FMAP_SPD_CACHE_ENTRY := $(CONFIG_SPD_CACHE_FMAP_NAME)@$(call _tohex,$(FMAP_SPD_CACHE_BASE)) $(call _tohex,$(FMAP_SPD_CACHE_SIZE))
 FMAP_CURRENT_BASE := $(call int-add, $(FMAP_SPD_CACHE_BASE) $(FMAP_SPD_CACHE_SIZE))
 else
 FMAP_SPD_CACHE_ENTRY :=
@@ -1146,7 +1164,7 @@ endif
 ifeq ($(CONFIG_VPD),y)
 FMAP_VPD_BASE := $(call int-align, $(FMAP_CURRENT_BASE), 0x4000)
 FMAP_VPD_SIZE := $(CONFIG_VPD_FMAP_SIZE)
-FMAP_VPD_ENTRY := $(CONFIG_VPD_FMAP_NAME)@$(FMAP_VPD_BASE) $(FMAP_VPD_SIZE)
+FMAP_VPD_ENTRY := $(CONFIG_VPD_FMAP_NAME)@$(call _tohex,$(FMAP_VPD_BASE)) $(call _tohex,$(FMAP_VPD_SIZE))
 FMAP_CURRENT_BASE := $(call int-add, $(FMAP_VPD_BASE) $(FMAP_VPD_SIZE))
 else
 FMAP_VPD_ENTRY :=
@@ -1155,7 +1173,7 @@ endif
 ifeq ($(CONFIG_INCLUDE_HSPHY_IN_FMAP),y)
 FMAP_HSPHY_FW_BASE := $(call int-align, $(FMAP_CURRENT_BASE), 0x1000)
 FMAP_HSPHY_FW_SIZE := $(CONFIG_HSPHY_FW_MAX_SIZE)
-FMAP_HSPHY_FW_ENTRY := HSPHY_FW@$(FMAP_HSPHY_FW_BASE) $(FMAP_HSPHY_FW_SIZE)
+FMAP_HSPHY_FW_ENTRY := HSPHY_FW@$(call _tohex,$(FMAP_HSPHY_FW_BASE)) $(call _tohex,$(FMAP_HSPHY_FW_SIZE))
 FMAP_CURRENT_BASE := $(call int-add, $(FMAP_HSPHY_FW_BASE) $(FMAP_HSPHY_FW_SIZE))
 else
 FMAP_HSPHY_FW_ENTRY :=
@@ -1173,7 +1191,7 @@ FMAP_FMAP_SIZE := 0x200
 # X86 COREBOOT default cbfs FMAP region
 #
 # position and size of CBFS, relative to BIOS_BASE
-FMAP_CBFS_BASE := $(call int-add, $(FMAP_FMAP_BASE) $(FMAP_FMAP_SIZE))
+FMAP_CBFS_BASE := $(call int-align, $(call int-add, $(FMAP_FMAP_BASE) $(FMAP_FMAP_SIZE)), 0x1000)
 FMAP_CBFS_SIZE := $(call int-subtract, $(FMAP_BIOS_SIZE) $(FMAP_CBFS_BASE))
 
 else # ifeq ($(CONFIG_ARCH_X86),y)
@@ -1197,7 +1215,7 @@ FMAP_CURRENT_BASE := $(call int-add, $(FMAP_FMAP_BASE) $(FMAP_FMAP_SIZE))
 ifeq ($(CONFIG_CONSOLE_SPI_FLASH),y)
 FMAP_CONSOLE_BASE := $(FMAP_CURRENT_BASE)
 FMAP_CONSOLE_SIZE := $(CONFIG_CONSOLE_SPI_FLASH_BUFFER_SIZE)
-FMAP_CONSOLE_ENTRY := CONSOLE@$(FMAP_CONSOLE_BASE) $(FMAP_CONSOLE_SIZE)
+FMAP_CONSOLE_ENTRY := CONSOLE@$(call _tohex,$(FMAP_CONSOLE_BASE)) $(call _tohex,$(FMAP_CONSOLE_SIZE))
 FMAP_CURRENT_BASE := $(call int-add, $(FMAP_CONSOLE_BASE) $(FMAP_CONSOLE_SIZE))
 else
 FMAP_CONSOLE_ENTRY :=
@@ -1210,7 +1228,7 @@ endif
 ifeq ($(CONFIG_CACHE_MRC_SETTINGS),y)
 FMAP_MRC_CACHE_BASE := $(call int-align, $(FMAP_CURRENT_BASE), 0x10000)
 FMAP_MRC_CACHE_SIZE := $(CONFIG_MRC_SETTINGS_CACHE_SIZE)
-FMAP_MRC_CACHE_ENTRY := RW_MRC_CACHE@$(FMAP_MRC_CACHE_BASE) $(FMAP_MRC_CACHE_SIZE)
+FMAP_MRC_CACHE_ENTRY := RW_MRC_CACHE@$(call _tohex,$(FMAP_MRC_CACHE_BASE)) $(call _tohex,$(FMAP_MRC_CACHE_SIZE))
 FMAP_CURRENT_BASE := $(call int-add, $(FMAP_MRC_CACHE_BASE) $(FMAP_MRC_CACHE_SIZE))
 else
 FMAP_MRC_CACHE_ENTRY :=
@@ -1226,10 +1244,10 @@ FMAP_CBFS_SIZE := $(call int-subtract,$(FMAP_BIOS_SIZE) $(FMAP_CBFS_BASE))
 endif # ifeq ($(CONFIG_ARCH_X86),y)
 
 $(obj)/fmap.fmd: $(top)/Makefile.mk $(DEFAULT_FLASHMAP) $(obj)/config.h
-	sed -e "s,##ROM_SIZE##,$(FMAP_ROM_SIZE)," \
-	    -e "s,##BIOS_BASE##,$(FMAP_BIOS_BASE)," \
-	    -e "s,##BIOS_SIZE##,$(FMAP_BIOS_SIZE)," \
-	    -e "s,##FMAP_BASE##,$(FMAP_FMAP_BASE)," \
+	sed -e "s,##ROM_SIZE##,$(call _tohex,$(FMAP_ROM_SIZE))," \
+	    -e "s,##BIOS_BASE##,$(call _tohex,$(FMAP_BIOS_BASE))," \
+	    -e "s,##BIOS_SIZE##,$(call _tohex,$(FMAP_BIOS_SIZE))," \
+	    -e "s,##FMAP_BASE##,$(call _tohex,$(FMAP_FMAP_BASE))," \
 	    -e "s,##FMAP_SIZE##,$(FMAP_FMAP_SIZE)," \
 	    -e "s,##CONSOLE_ENTRY##,$(FMAP_CONSOLE_ENTRY)," \
 	    -e "s,##MRC_CACHE_ENTRY##,$(FMAP_MRC_CACHE_ENTRY)," \
@@ -1237,8 +1255,8 @@ $(obj)/fmap.fmd: $(top)/Makefile.mk $(DEFAULT_FLASHMAP) $(obj)/config.h
 	    -e "s,##SPD_CACHE_ENTRY##,$(FMAP_SPD_CACHE_ENTRY)," \
 	    -e "s,##VPD_ENTRY##,$(FMAP_VPD_ENTRY)," \
 	    -e "s,##HSPHY_FW_ENTRY##,$(FMAP_HSPHY_FW_ENTRY)," \
-	    -e "s,##CBFS_BASE##,$(FMAP_CBFS_BASE)," \
-	    -e "s,##CBFS_SIZE##,$(FMAP_CBFS_SIZE)," \
+	    -e "s,##CBFS_BASE##,$(call _tohex,$(FMAP_CBFS_BASE))," \
+	    -e "s,##CBFS_SIZE##,$(call _tohex,$(FMAP_CBFS_SIZE))," \
 		$(DEFAULT_FLASHMAP) > $@.tmp
 	mv $@.tmp $@
 else # ifeq ($(CONFIG_FMDFILE),)
@@ -1257,8 +1275,16 @@ $(obj)/fmap.fmap: $(obj)/fmap.fmd $(FMAPTOOL)
 	echo "    FMAP       $(FMAPTOOL) -h $(obj)/fmap_config.h $< $@"
 	$(FMAPTOOL) -h $(obj)/fmap_config.h -R $(obj)/fmap.desc $< $@
 
-ifeq ($(CONFIG_INTEL_ADD_TOP_SWAP_BOOTBLOCK),y)
-TS_OPTIONS := -j $(CONFIG_INTEL_TOP_SWAP_BOOTBLOCK_SIZE)
+ifneq ($(CONFIG_INTEL_TOP_SWAP_SEPARATE_REGIONS),y)
+BB_FIT_REGION = COREBOOT
+TS_FIT_REGION = COREBOOT
+else
+BB_FIT_REGION = BOOTBLOCK
+TS_FIT_REGION = TOPSWAP
+bootblock_add_params = -f $(objcbfs)/bootblock.bin \
+	  -n bootblock -t bootblock \
+	  -b -$(call file-size,$(objcbfs)/bootblock.bin) \
+	  $(TXTIBB) $(cbfs-autogen-attributes) $(TS_OPTIONS) $(CBFSTOOL_ADD_CMD_OPTIONS)
 endif
 
 ifneq ($(CONFIG_ARCH_X86),y)
@@ -1272,8 +1298,17 @@ $(shell rm -f $(obj)/coreboot.pre)
 ifneq ($(CONFIG_UPDATE_IMAGE),y)
 $(obj)/coreboot.pre: $$(prebuilt-files) $(CBFSTOOL) $(obj)/fmap.fmap $(obj)/fmap.desc $(objcbfs)/bootblock.bin
 	$(CBFSTOOL) $@.tmp create -M $(obj)/fmap.fmap -r $(shell cat $(obj)/fmap.desc)
+# The bootblock must exist in the image before we call `prebuild-files`,
+# otherwise their hashes won't be added into the CBFS header and CBFS
+# verification will fail.
 	printf "    BOOTBLOCK\n"
+ifneq ($(CONFIG_INTEL_TOP_SWAP_SEPARATE_REGIONS),y)
 	$(call add_bootblock,$@.tmp,$(objcbfs)/bootblock.bin)
+else
+	@printf "    PREP       place bootblocks in $(BB_FIT_REGION) and $(TS_FIT_REGION)\n"
+	@printf "    $(BB_FIT_REGION),$(TS_FIT_REGION)\n"
+	$(CBFSTOOL) $@.tmp add -r $(BB_FIT_REGION),$(TS_FIT_REGION) $(bootblock_add_params)
+endif # ifneq ($(CONFIG_INTEL_TOP_SWAP_SEPARATE_REGIONS),y)
 	$(prebuild-files) true
 	mv $@.tmp $@
 else # ifneq ($(CONFIG_UPDATE_IMAGE),y)
@@ -1311,11 +1346,11 @@ $(obj)/coreboot.rom: $(obj)/coreboot.pre $(CBFSTOOL) $(IFITTOOL) $$(INTERMEDIATE
 	dd if=$(obj)/coreboot.pre of=$@.tmp bs=8192 conv=notrunc 2> /dev/null
 ifeq ($(CONFIG_CPU_INTEL_FIRMWARE_INTERFACE_TABLE),y)
 # Print final FIT table
-	$(IFITTOOL) -f $@.tmp -D -r COREBOOT
+	$(IFITTOOL) -f $@.tmp -D -r $(BB_FIT_REGION)
 # Print final TS BOOTBLOCK FIT table
 ifeq ($(CONFIG_INTEL_ADD_TOP_SWAP_BOOTBLOCK),y)
 	@printf "    TOP SWAP FIT table\n"
-	$(IFITTOOL) -f $@.tmp -D $(TS_OPTIONS) -r COREBOOT
+	$(IFITTOOL) -f $@.tmp -D $(TS_OPTIONS) -r $(TS_FIT_REGION)
 endif # CONFIG_INTEL_ADD_TOP_SWAP_BOOTBLOCK
 endif # CONFIG_CPU_INTEL_FIRMWARE_INTERFACE_TABLE
 	mv $@.tmp $@
@@ -1323,8 +1358,8 @@ endif # CONFIG_CPU_INTEL_FIRMWARE_INTERFACE_TABLE
 	$(CBFSTOOL) $@ layout
 	@printf "    CBFSPRINT  $(subst $(obj)/,,$(@))\n\n"
 ifeq ($(CONFIG_CBFS_VERIFICATION),y)
-	line=$$($(CBFSTOOL) $@ print -kv 2>/dev/null | grep -F '[CBFS VERIFICATION (COREBOOT)]') ;\
-	if ! printf "$$line" | grep -q 'fully valid'; then \
+	line=$$($(CBFSTOOL) $@ print -kv -r $(CBFS_REGIONS) 2>/dev/null | grep -F '[CBFS VERIFICATION') ;\
+	if [ "$$(printf "$$line" | grep -c 'fully valid')" -ne $(CBFS_REGION_COUNT) ]; then \
 		echo "CBFS verification error: $$line" ;\
 		exit 1 ;\
 	fi

@@ -90,6 +90,7 @@ enum {
 	CB_TAG_OPTION_ENUM		= 0x00ca,
 	CB_TAG_OPTION_DEFAULTS		= 0x00cb,
 	CB_TAG_OPTION_CHECKSUM		= 0x00cc,
+	CB_TAG_BOOT_MODE		= 0x00cd,
 };
 
 typedef __aligned(4) uint64_t cb_uint64_t;
@@ -121,6 +122,7 @@ struct cb_memory_range {
 #define CB_MEM_UNUSABLE     5
 #define CB_MEM_VENDOR_RSVD  6
 #define CB_MEM_TABLE       16
+#define CB_MEM_TAG         17
 
 struct cb_memory {
 	u32 tag;
@@ -222,7 +224,8 @@ enum cb_fb_orientation {
 
 struct cb_framebuffer_flags {
 	u8 has_external_display : 1;
-	u8 reserved : 7;
+	u8 has_dual_pipe : 1;
+	u8 reserved : 6;
 };
 
 struct cb_framebuffer {
@@ -443,6 +446,23 @@ struct cb_acpi_rsdp {
 	cb_uint64_t rsdp_pointer; /* Address of the ACPI RSDP */
 };
 
+enum boot_mode_t {
+	CB_BOOT_MODE_NORMAL,
+	CB_BOOT_MODE_LOW_BATTERY,
+	CB_BOOT_MODE_OFFMODE_CHARGING,
+};
+
+/*
+ * Boot Mode: Pass the platform boot mode information to payload about
+ * booting in low-battery mode or off-mode charging. These information
+ * is useful for payload to implement charger driver.
+ */
+struct cb_boot_mode {
+	uint32_t tag;
+	uint32_t size;
+
+	enum boot_mode_t boot_mode;
+};
 
 /* Helpful inlines */
 

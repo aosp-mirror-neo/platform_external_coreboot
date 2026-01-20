@@ -45,6 +45,45 @@ chip soc/intel/alderlake
 
 	register "platform_pmax" = "208"
 
+	# Intel Common SoC Config
+	#+-------------------+---------------------------+
+	#| Field             |  Value                    |
+	#+-------------------+---------------------------+
+	#| I2C0              | Trackpad                  |
+	#| I2C1              | Touchscreen               |
+	#| I2C2              | ISH Sensor                |
+	#| I2C4              | cr50 TPM. Early init is   |
+	#|                   | required to set up a BAR  |
+	#|                   | for TPM communication     |
+	#+-------------------+---------------------------+
+	register "common_soc_config" = "{
+		.i2c[0] = {
+			.speed = I2C_SPEED_FAST,
+			.rise_time_ns = 650,
+			.fall_time_ns = 330,
+			.data_hold_time_ns = 250,
+		},
+		.i2c[1] = {
+			.speed = I2C_SPEED_FAST,
+			.rise_time_ns = 600,
+			.fall_time_ns = 350,
+			.data_hold_time_ns = 50,
+		},
+		.i2c[2] = {
+			.speed = I2C_SPEED_FAST,
+			.rise_time_ns = 600,
+			.fall_time_ns = 400,
+			.data_hold_time_ns = 50,
+		},
+		.i2c[4] = {
+			.early_init = 1,
+			.speed = I2C_SPEED_FAST,
+			.rise_time_ns = 650,
+			.fall_time_ns = 400,
+			.data_hold_time_ns = 50,
+		},
+	}"
+
 	device domain 0 on
 		device ref dtt on
 			chip drivers/intel/dptf
@@ -233,11 +272,11 @@ chip soc/intel/alderlake
 				end
 			end
 		end
-		device ref pcie4_1 on
-			# Enable CPU PCIE RP 3 using CLK 0
-			register "cpu_pcie_rp[CPU_RP(3)]" = "{
-				.clk_req = 0,
-				.clk_src = 0,
+		device ref pcie4_0 on
+			# Enable CPU PCIE RP 1 using CLK 3
+			register "cpu_pcie_rp[CPU_RP(1)]" = "{
+				.clk_req = 3,
+				.clk_src = 3,
 				.flags = PCIE_RP_LTR | PCIE_RP_AER,
 				.pcie_rp_aspm = ASPM_L1,
 			}"
@@ -252,7 +291,7 @@ chip soc/intel/alderlake
 				.flags = PCIE_RP_LTR | PCIE_RP_AER,
 			}"
 			chip soc/intel/common/block/pcie/rtd3
-				register "reset_gpio" = "ACPI_GPIO_OUTPUT_ACTIVE_LOW(GPP_A21)"
+				register "reset_gpio" = "ACPI_GPIO_OUTPUT_ACTIVE_HIGH(GPP_A21)"
 				register "reset_off_delay_ms" = "20"
 				register "srcclk_pin" = "6"
 				register "ext_pm_support" = "ACPI_PCIE_RP_EMIT_ALL"
@@ -265,7 +304,7 @@ chip soc/intel/alderlake
 			chip drivers/wwan/fm
 				register "fcpo_gpio" = "ACPI_GPIO_OUTPUT_ACTIVE_LOW(GPP_F21)"
 				register "reset_gpio" = "ACPI_GPIO_OUTPUT_ACTIVE_LOW(GPP_D19)"
-				register "perst_gpio" = "ACPI_GPIO_OUTPUT_ACTIVE_LOW(GPP_A21)"
+				register "perst_gpio" = "ACPI_GPIO_OUTPUT_ACTIVE_HIGH(GPP_A21)"
 				register "wake_gpio" = "ACPI_GPIO_IRQ_EDGE_LOW(GPP_E5)"
 				register "add_acpi_dma_property" = "true"
 				use rp4_rtd3 as rtd3dev
@@ -307,7 +346,7 @@ chip soc/intel/alderlake
 				.flags = PCIE_RP_LTR | PCIE_RP_AER,
 			}"
 			chip drivers/net
-				register "customized_leds" = "0x05af"
+				register "customized_leds" = "0x0807"
 				register "device_index" = "0"
 				register "enable_aspm_l1_2" = "1"
 				register "add_acpi_dma_property" = "true"

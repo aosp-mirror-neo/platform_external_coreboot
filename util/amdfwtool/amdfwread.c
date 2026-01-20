@@ -12,6 +12,26 @@
 
 #define ERR(...) fprintf(stderr, __VA_ARGS__)
 
+enum spi_frequency {
+	SPI_FREQUENCY_66_66MHZ = 0,
+	SPI_FREQUENCY_33_33MHZ = 1,
+	SPI_FREQUENCY_22_22MHZ = 2,
+	SPI_FREQUENCY_16_66MHZ = 3,
+	SPI_FREQUENCY_100MHZ = 4,
+	SPI_FREQUENCY_800KHZ = 5,
+};
+
+enum spi_read_mode {
+	SPI_READ_MODE_NORMAL_33 = 0,
+	SPI_READ_MODE_RESERVED = 1,
+	SPI_READ_MODE_DUAL_1_1_2 = 2,
+	SPI_READ_MODE_QUAD_1_1_4 = 3,
+	SPI_READ_MODE_DUAL_1_2_2 = 4,
+	SPI_READ_MODE_QUAD_1_4_4 = 5,
+	SPI_READ_MODE_NORMAL_66 = 6,
+	SPI_READ_MODE_FAST = 7,
+};
+
 /* Possible locations for the header */
 const uint32_t fw_header_offsets[] = {
 	0xfa0000,
@@ -93,6 +113,9 @@ static int read_psp_directory(FILE *fw, uint32_t offset, uint32_t expected_cooki
 		return 1;
 	}
 
+	if (!entries || !num_entries)
+		return 0;
+
 	/* Read the entries */
 	*num_entries = header->num_entries;
 	*entries = malloc(sizeof(psp_directory_entry) * header->num_entries);
@@ -128,6 +151,9 @@ static int read_bios_directory(FILE *fw, uint32_t offset, uint32_t expected_cook
 		return 1;
 	}
 
+	if (!entries || !num_entries)
+		return 0;
+
 	/* Read the entries */
 	*num_entries = header->num_entries;
 	*entries = malloc(sizeof(bios_directory_entry) * header->num_entries);
@@ -146,8 +172,8 @@ static int read_soft_fuse(FILE *fw, const embedded_firmware *fw_header)
 	size_t num_current_entries = 0;
 
 	uint32_t psp_offset = 0;
-	/* 0xffffffff indicates that the offset is in new_psp_directory */
-	if (fw_header->psp_directory != 0xffffffff)
+	/* 0xffffffff or 0x00000000 indicates that the offset is in new_psp_directory */
+	if (fw_header->psp_directory != 0xffffffff && fw_header->psp_directory != 0x00000000)
 		psp_offset = fw_header->psp_directory;
 	else
 		psp_offset = fw_header->new_psp_directory;
@@ -243,17 +269,26 @@ static int amdfw_bios_dir_walk(FILE *fw, uint32_t bios_offset, uint32_t cookie, 
 	size_t num_current_entries = 0;
 	bios_directory_hdr header;
 	uint32_t l2_dir_offset = 0;
+	uint64_t dir_mode = 0;
 	char indent[MAX_INDENTATION_LEN] = {0};
 
 	if (read_bios_directory(fw, bios_offset, cookie, &header,
 		       &current_entries, &num_current_entries) != 0)
 		return 1;
 
+	if (header.additional_info_fields.version == 1)
+		dir_mode = header.additional_info_fields_v1.address_mode;
+	else
+		dir_mode = header.additional_info_fields.address_mode;
+
 	do_indentation_string(indent, level);
 	for (size_t i = 0; i < num_current_entries; i++) {
 		uint32_t type = current_entries[i].type;
 		uint64_t mode = current_entries[i].address_mode;
 		uint64_t addr = current_entries[i].source;
+
+		if (dir_mode < 2)
+			mode = dir_mode;
 
 		if (type == AMD_BIOS_APOB || type == AMD_BIOS_PSP_SHARED_MEM)
 			printf("%sBIOS%s: 0x%02x 0x%lx(DRAM-Address)\n",
@@ -284,6 +319,64 @@ static int amdfw_bios_dir_walk(FILE *fw, uint32_t bios_offset, uint32_t cookie, 
 	return 0;
 }
 
+/*
+ * Returns the size of the PSP directory.
+ *
+ * @param fw			File to operate on
+ * @param psp_offset		Relative offset to PSP directory
+ * @param cookie		Expected table cookie
+ * @param size			Where to write the size to
+ *
+ * @return 0 on success, or < 0 on error.
+ */
+static int amdfw_psp_dir_size(FILE *fw, uint32_t psp_offset, uint32_t cookie, uint32_t *size)
+{
+	psp_directory_header header;
+
+	if (!fw || !size)
+		return -1;
+
+	if (read_psp_directory(fw, psp_offset, cookie, &header, NULL, NULL) != 0)
+		return -1;
+
+	if (header.additional_info_fields.version == 1)
+		*size = header.additional_info_fields_v1.dir_size;
+	else
+		*size = header.additional_info_fields.dir_size;
+
+	*size *= TABLE_ALIGNMENT;
+	return 0;
+}
+
+/*
+ * Returns the size of the BIOS directory.
+ *
+ * @param fw			File to operate on
+ * @param bios_offset		Relative offset to BIOS directory
+ * @param cookie		Expected table cookie
+ * @param size			Where to write the size to
+ *
+ * @return 0 on success, or < 0 on error.
+ */
+static int amdfw_bios_dir_size(FILE *fw, uint32_t bios_offset, uint32_t cookie, uint32_t *size)
+{
+	bios_directory_hdr header;
+
+	if (!fw || !size)
+		return -1;
+
+	if (read_bios_directory(fw, bios_offset, cookie, &header, NULL, NULL) != 0)
+		return -1;
+
+	if (header.additional_info_fields.version == 1)
+		*size = header.additional_info_fields_v1.dir_size;
+	else
+		*size = header.additional_info_fields.dir_size;
+
+	*size *= TABLE_ALIGNMENT;
+	return 0;
+}
+
 static int amdfw_psp_dir_walk(FILE *fw, uint32_t psp_offset, uint32_t cookie, uint8_t level)
 {
 	psp_directory_entry *current_entries = NULL;
@@ -293,22 +386,31 @@ static int amdfw_psp_dir_walk(FILE *fw, uint32_t psp_offset, uint32_t cookie, ui
 	uint32_t bios_dir_offset = 0;
 	uint32_t ish_dir_offset = 0;
 	ish_directory_table ish_dir;
+	uint64_t dir_mode = 0;
 	char indent[MAX_INDENTATION_LEN] = {0};
 
 	if (read_psp_directory(fw, psp_offset, cookie, &header,
 		       &current_entries, &num_current_entries) != 0)
 		return 1;
 
+	if (header.additional_info_fields.version == 1)
+		dir_mode = header.additional_info_fields_v1.address_mode;
+	else
+		dir_mode = header.additional_info_fields.address_mode;
+
 	do_indentation_string(indent, level);
 	for (size_t i = 0; i < num_current_entries; i++) {
 		uint32_t type = current_entries[i].type;
 		uint64_t mode = current_entries[i].address_mode;
 		uint64_t addr = current_entries[i].addr;
+		uint32_t dir_size = 0;
+		if (dir_mode < 2)
+			mode = dir_mode;
 
 		if (type == AMD_PSP_FUSE_CHAIN)
 			printf("%sPSP%s: 0x%02x 0x%lx(Soft-fuse)\n",
 				indent, cookie == PSP_COOKIE ? "L1" : "L2",
-				type, mode << 62 | addr);
+				type, (uint64_t)current_entries[i].address_mode << 62 | addr);
 		else
 			printf("%sPSP%s: 0x%02x 0x%08lx 0x%08x\n",
 				indent, cookie == PSP_COOKIE ? "L1" : "L2",
@@ -327,6 +429,10 @@ static int amdfw_psp_dir_walk(FILE *fw, uint32_t psp_offset, uint32_t cookie, ui
 
 			l2_dir_offset = relative_offset(psp_offset, addr, mode);
 			printf("    %sPSPL2: Dir  0x%08x\n", indent, l2_dir_offset);
+			if (amdfw_psp_dir_size(fw, l2_dir_offset, PSPL2_COOKIE, &dir_size) == 0)
+				printf("    %sPSPL2: Dir  [0x%08x-0x%08x)\n", indent, l2_dir_offset, l2_dir_offset + dir_size);
+			else
+				printf("    %sPSPL2: Dir  @0x%08x\n", indent, l2_dir_offset);
 			amdfw_psp_dir_walk(fw, l2_dir_offset, PSPL2_COOKIE, level + 2);
 			break;
 
@@ -346,13 +452,19 @@ static int amdfw_psp_dir_walk(FILE *fw, uint32_t psp_offset, uint32_t cookie, ui
 			}
 
 			l2_dir_offset = ish_dir.pl2_location;
-			printf("    %sPSPL2: Dir  0x%08x\n", indent, l2_dir_offset);
+			if (amdfw_psp_dir_size(fw, l2_dir_offset, PSPL2_COOKIE, &dir_size) == 0)
+				printf("    %sPSPL2: Dir  [0x%08x-0x%08x)\n", indent, l2_dir_offset, l2_dir_offset + dir_size);
+			else
+				printf("    %sPSPL2: Dir  @0x%08x\n", indent, l2_dir_offset);
 			amdfw_psp_dir_walk(fw, l2_dir_offset, PSPL2_COOKIE, level + 2);
 			break;
 
 		case AMD_FW_BIOS_TABLE:
 			bios_dir_offset = relative_offset(psp_offset, addr, mode);
-			printf("    %sBIOSL2: Dir  0x%08x\n", indent, bios_dir_offset);
+			if (amdfw_bios_dir_size(fw, bios_dir_offset, BHDL2_COOKIE, &dir_size) == 0)
+				printf("    %sBIOSL2: Dir  [0x%08x-0x%08x)\n", indent, bios_dir_offset, bios_dir_offset + dir_size);
+			else
+				printf("    %sBIOSL2: Dir  @0x%08x\n", indent, bios_dir_offset);
 			amdfw_bios_dir_walk(fw, bios_dir_offset, BHDL2_COOKIE, level + 2);
 			break;
 
@@ -368,25 +480,36 @@ static int amdfw_psp_dir_walk(FILE *fw, uint32_t psp_offset, uint32_t cookie, ui
 
 static int list_amdfw_psp_dir(FILE *fw, const embedded_firmware *fw_header)
 {
-	uint32_t psp_offset = 0;
+	uint32_t psp_offset = 0, dir_size = 0;
 
-	/* 0xffffffff indicates that the offset is in new_psp_directory */
-	if (fw_header->psp_directory != 0xffffffff)
+	/* 0xffffffff or 0x00000000 indicates that the offset is in new_psp_directory */
+	if (fw_header->psp_directory != 0xffffffff && fw_header->psp_directory != 0x00000000)
 		psp_offset = fw_header->psp_directory;
 	else
 		psp_offset = fw_header->new_psp_directory;
 
-	printf("PSPL1: Dir  0x%08x\n", psp_offset);
+	if (amdfw_psp_dir_size(fw, psp_offset, PSP_COOKIE, &dir_size) == 0)
+		printf("PSPL1: Dir  [0x%08x-0x%08x)\n", psp_offset, psp_offset + dir_size);
+	else
+		printf("PSPL1: Dir  @0x%08x\n", psp_offset);
+
 	amdfw_psp_dir_walk(fw, psp_offset, PSP_COOKIE, 0);
 	return 0;
 }
 
 static int list_amdfw_bios_dir(FILE *fw, const embedded_firmware *fw_header)
 {
-	/* 0xffffffff implies that the SoC uses recovery A/B layout. Only BIOS L2 directory
-	   is present and that too as part of PSP L2 directory. */
-	if (fw_header->bios3_entry != 0xffffffff) {
-		printf("BIOSL1: Dir  0x%08x\n", fw_header->bios3_entry);
+	uint32_t dir_size = 0;
+
+	/* 0xffffffff or 0x00000000 implies that the SoC uses recovery A/B
+	   layout. Only BIOS L2 directory is present and that too as part of
+	   PSP L2 directory. */
+	if (fw_header->bios3_entry != 0xffffffff && fw_header->bios3_entry != 0x00000000) {
+		if (amdfw_psp_dir_size(fw, fw_header->bios3_entry, BHD_COOKIE, &dir_size) == 0)
+			printf("BIOSL1: Dir  [0x%08x-0x%08x)\n", fw_header->bios3_entry, fw_header->bios3_entry + dir_size);
+		else
+			printf("BIOSL1: Dir  @0x%08x\n", fw_header->bios3_entry);
+
 		amdfw_bios_dir_walk(fw, fw_header->bios3_entry, BHD_COOKIE, 0);
 	}
 	return 0;
@@ -401,16 +524,102 @@ static int list_amdfw_ro(FILE *fw, const embedded_firmware *fw_header)
 	return 0;
 }
 
+static void decode_spi_frequency(unsigned int freq)
+{
+	switch (freq) {
+	case SPI_FREQUENCY_66_66MHZ:
+		printf("66.66MHz");
+		break;
+	case SPI_FREQUENCY_33_33MHZ:
+		printf("33.33MHz");
+		break;
+	case SPI_FREQUENCY_22_22MHZ:
+		printf("22.22MHz");
+		break;
+	case SPI_FREQUENCY_16_66MHZ:
+		printf("16.66MHz");
+		break;
+	case SPI_FREQUENCY_100MHZ:
+		printf("100MHz");
+		break;
+	case SPI_FREQUENCY_800KHZ:
+		printf("800kHz");
+		break;
+	default:
+		printf("unknown<%x>MHz", freq);
+	}
+}
+
+static void decode_spi_read_mode(unsigned int mode)
+{
+	switch (mode) {
+	case SPI_READ_MODE_NORMAL_33:
+		printf("Normal read (up to 33M)");
+		break;
+	case SPI_READ_MODE_RESERVED:
+		printf("Reserved");
+		break;
+	case SPI_READ_MODE_DUAL_1_1_2:
+		printf("Dual IO (1-1-2)");
+		break;
+	case SPI_READ_MODE_QUAD_1_1_4:
+		printf("Quad IO (1-1-4)");
+		break;
+	case SPI_READ_MODE_DUAL_1_2_2:
+		printf("Dual IO (1-2-2)");
+		break;
+	case SPI_READ_MODE_QUAD_1_4_4:
+		printf("Quad IO (1-4-4)");
+		break;
+	case SPI_READ_MODE_NORMAL_66:
+		printf("Normal read (up to 66M)");
+		break;
+	case SPI_READ_MODE_FAST:
+		printf("Fast Read");
+		break;
+	default:
+		printf("unknown<%x>mode", mode);
+	}
+}
+
+static int dump_efw(const embedded_firmware *fw_header)
+{
+	printf("EFS Generation:    %s\n", fw_header->efs_gen.gen ? "first" : "second");
+
+	printf("\nFamily 15h Models 60h-6Fh");
+	printf("\n  SPI Read Mode          ");
+	decode_spi_read_mode(fw_header->spi_readmode_f15_mod_60_6f);
+	printf("\n  SPI Frequency:         ");
+	decode_spi_frequency(fw_header->fast_speed_new_f15_mod_60_6f);
+
+	printf("\n\nFamily 17h Models 00h-0Fh, 10h-1Fh");
+	printf("\n  SPI Read Mode:         ");
+	decode_spi_read_mode(fw_header->spi_readmode_f17_mod_00_2f);
+	printf("\n  Fast Speed New:        ");
+	decode_spi_frequency(fw_header->spi_fastspeed_f17_mod_00_2f);
+	printf("\n  QPR_Dummy Cycle configure:    0x%02x\n", fw_header->qpr_dummy_cycle_f17_mod_00_2f);
+
+	printf("\nFamily 17h Models 30h-3Fh and later Families");
+	printf("\n  SPI Read Mode:         ");
+	decode_spi_read_mode(fw_header->spi_readmode_f17_mod_30_3f);
+	printf("\n  SPI Fast Speed:        ");
+	decode_spi_frequency(fw_header->spi_fastspeed_f17_mod_30_3f);
+	printf("\n  Micron Detect Flag:    0x%02x\n", fw_header->micron_detect_f17_mod_30_3f);
+	return 0;
+}
+
 enum {
 	AMDFW_OPT_HELP = 'h',
+	AMDFW_OPT_DUMP = 'd',
 	AMDFW_OPT_SOFT_FUSE = 1UL << 0, /* Print Softfuse */
 	AMDFW_OPT_RO_LIST = 1UL << 1, /* List entries in AMDFW RO */
 };
 
-static char const optstring[] = {AMDFW_OPT_HELP};
+static const char optstring[] = {AMDFW_OPT_HELP, AMDFW_OPT_DUMP};
 
 static struct option long_options[] = {
 	{"help", no_argument, 0, AMDFW_OPT_HELP},
+	{"dump", no_argument, 0, AMDFW_OPT_DUMP},
 	{"soft-fuse", no_argument, 0, AMDFW_OPT_SOFT_FUSE},
 	{"ro-list", no_argument, 0, AMDFW_OPT_RO_LIST},
 };
@@ -419,6 +628,7 @@ static void print_usage(void)
 {
 	printf("amdfwread: Examine AMD firmware images\n");
 	printf("Usage: amdfwread [options] <file>\n");
+	printf("-d | --dump                Dump Embedded Firmware Structure\n");
 	printf("--soft-fuse                Print soft fuse value\n");
 	printf("--ro-list                  List the programs under AMDFW in RO region\n");
 }
@@ -426,6 +636,7 @@ static void print_usage(void)
 int main(int argc, char **argv)
 {
 	char *fw_file = NULL;
+	int mode_dump = 0;
 
 	int selected_functions = 0;
 	while (1) {
@@ -447,6 +658,9 @@ int main(int argc, char **argv)
 		case AMDFW_OPT_HELP:
 			print_usage();
 			return 0;
+		case AMDFW_OPT_DUMP:
+			mode_dump = 1;
+			break;
 
 		case AMDFW_OPT_SOFT_FUSE:
 		case AMDFW_OPT_RO_LIST:
@@ -479,6 +693,9 @@ int main(int argc, char **argv)
 		fclose(fw);
 		return 1;
 	}
+
+	if (mode_dump)
+		dump_efw(&fw_header);
 
 	if (selected_functions & AMDFW_OPT_SOFT_FUSE) {
 		if (read_soft_fuse(fw, &fw_header) != 0) {

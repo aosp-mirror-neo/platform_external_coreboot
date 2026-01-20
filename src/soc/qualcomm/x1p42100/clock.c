@@ -5,6 +5,7 @@
 #include <device/mmio.h>
 #include <soc/clock.h>
 #include <types.h>
+#include <stdbool.h>
 
 static struct clock_freq_config qspi_core_cfg[] = {
 	{
@@ -234,11 +235,98 @@ struct pcie pcie_cfg[] = {
 	},
 };
 
+static u32 *usb_gdsc[MAX_USB_GDSC] = {
+	[USB30_MP_GDSC] = &gcc->gcc_usb30_mp_gdscr,
+	[USB3_SS0_PHY_GDSC] = &gcc->gcc_usb3_mp_ss0_phy_gdscr,
+	[USB3_SS1_PHY_GDSC] = &gcc->gcc_usb3_mp_ss1_phy_gdscr,
+	[USB30_PRIM_GDSC] = &gcc->gcc_usb30_prim_gdscr,
+	[USB30_SEC_GDSC] = &gcc->gcc_usb30_sec_gdscr,
+};
+
+static u32 *usb_mp_cbcr[USB_CLK_COUNT] = {
+	[USB30_MP_MASTER_CBCR] = &gcc->gcc_usb30_mp_master_cbcr,
+	[USB30_MP_SLEEP_CBCR] = &gcc->gcc_usb30_mp_sleep_cbcr,
+	[USB30_MP_MOCK_UTMI_CBCR] = &gcc->gcc_usb30_mp_mock_utmi_cbcr,
+	[USB3_MP_PHY_AUX_CBCR] = &gcc->gcc_usb3_mp_phy_aux_cbcr,
+	[USB3_MP_PHY_COM_AUX_CBCR] = &gcc->gcc_usb3_mp_phy_com_aux_cbcr,
+	[USB3_MP_PHY_PIPE_0_CBCR] = &gcc->gcc_usb3_mp_phy_pipe_0_cbcr,
+	[USB3_MP_PHY_PIPE_1_CBCR] = &gcc->gcc_usb3_mp_phy_pipe_1_cbcr,
+	[CFG_NOC_USB3_MP_AXI_CBCR] = &gcc->gcc_cfg_noc_usb3_mp_axi_cbcr,
+	[AGGRE_USB3_MP_AXI_CBCR] = &gcc->gcc_aggre_usb3_mp_axi_cbcr,
+	[SYS_NOC_USB_AXI_CBCR] = &gcc->gcc_sys_noc_usb_axi_cbcr,
+	[CFG_NOC_USB_ANOC_NORTH_AHB_CBCR] = &gcc->gcc_cfg_noc_usb_anoc_north_ahb_cbcr,
+	[CFG_NOC_USB_ANOC_SOUTH_AHB_CBCR] = &gcc->gcc_cfg_noc_usb_anoc_south_ahb_cbcr,
+	[AGGRE_USB_NOC_AXI_CBCR] = &gcc->gcc_aggre_usb_noc_axi_cbcr,
+	[AGGRE_NOC_USB_SOUTH_AXI_CBCR] = &gcc->gcc_aggre_noc_usb_south_axi_cbcr,
+	[AGGRE_NOC_USB_NORTH_AXI_CBCR] = &gcc->gcc_aggre_noc_usb_north_axi_cbcr,
+};
+
+static u32 *usb_prim_cbcr[USB_PRIM_CLK_COUNT] = {
+	[USB_PRIM_SYS_NOC_USB_AXI_CBCR] = &gcc->gcc_sys_noc_usb_axi_cbcr,
+	[USB_PRIM_CFG_NOC_USB_ANOC_AHB_CBCR] = &gcc->gcc_cfg_noc_usb_anoc_ahb_cbcr,
+	[USB_PRIM_CFG_NOC_USB_ANOC_NORTH_AHB_CBCR] = &gcc->gcc_cfg_noc_usb_anoc_north_ahb_cbcr,
+	[USB_PRIM_CFG_NOC_USB_ANOC_SOUTH_AHB_CBCR] = &gcc->gcc_cfg_noc_usb_anoc_south_ahb_cbcr,
+	[USB_PRIM_AGGRE_USB_NOC_AXI_CBCR] = &gcc->gcc_aggre_usb_noc_axi_cbcr,
+	[USB_PRIM_AGGRE_NOC_USB_SOUTH_AXI_CBCR] = &gcc->gcc_aggre_noc_usb_south_axi_cbcr,
+	[USB_PRIM_AGGRE_NOC_USB_NORTH_AXI_CBCR] = &gcc->gcc_aggre_noc_usb_north_axi_cbcr,
+	[USB_PRIM_USB30_PRIM_MASTER_CBCR] = &gcc->gcc_usb30_prim_master_cbcr,
+	[USB_PRIM_USB30_PRIM_SLEEP_CBCR] = &gcc->gcc_usb30_prim_sleep_cbcr,
+	[USB_PRIM_USB30_PRIM_MOCK_UTMI_CBCR] = &gcc->gcc_usb30_prim_mock_utmi_cbcr,
+	[USB_PRIM_USB3_PRIM_PHY_AUX_CBCR] = &gcc->gcc_usb3_prim_phy_aux_cbcr,
+	[USB_PRIM_USB3_PRIM_PHY_COM_AUX_CBCR] = &gcc->gcc_usb3_prim_phy_com_aux_cbcr,
+	[USB_PRIM_USB3_PRIM_PHY_PIPE_CBCR] = &gcc->gcc_usb3_prim_phy_pipe_cbcr,
+	[USB_PRIM_CFG_NOC_USB3_PRIM_AXI_CBCR] = &gcc->gcc_cfg_noc_usb3_prim_axi_cbcr,
+	[USB_PRIM_AGGRE_USB3_PRIM_AXI_CBCR] = &gcc->gcc_aggre_usb3_prim_axi_cbcr,
+};
+
+static u32 *usb_sec_cbcr[USB_SEC_CLK_COUNT] = {
+	[USB_SEC_CFG_NOC_USB3_SEC_AXI_CBCR] = &gcc->gcc_cfg_noc_usb3_sec_axi_cbcr,
+	[USB_SEC_AGGRE_USB3_SEC_AXI_CBCR] = &gcc->gcc_aggre_usb3_sec_axi_cbcr,
+	[USB_SEC_USB30_SEC_MASTER_CBCR] = &gcc->gcc_usb30_sec_master_cbcr,
+	[USB_SEC_USB30_SEC_SLEEP_CBCR] = &gcc->gcc_usb30_sec_sleep_cbcr,
+	[USB_SEC_USB30_SEC_MOCK_UTMI_CBCR] = &gcc->gcc_usb30_sec_mock_utmi_cbcr,
+	[USB_SEC_USB3_SEC_PHY_AUX_CBCR] = &gcc->gcc_usb3_sec_phy_aux_cbcr,
+	[USB_SEC_USB3_SEC_PHY_COM_AUX_CBCR] = &gcc->gcc_usb3_sec_phy_com_aux_cbcr,
+	[USB_SEC_USB3_SEC_PHY_PIPE_CBCR] = &gcc->gcc_usb3_sec_phy_pipe_cbcr,
+	[USB_SEC_AGGRE_USB_NOC_AXI_CBCR] = &gcc->gcc_aggre_usb_noc_axi_cbcr,
+	[USB_SEC_AGGRE_NOC_USB_NORTH_AXI_CBCR] = &gcc->gcc_aggre_noc_usb_north_axi_cbcr,
+	[USB_SEC_AGGRE_NOC_USB_SOUTH_AXI_CBCR] = &gcc->gcc_aggre_noc_usb_south_axi_cbcr,
+	[USB_SEC_SYS_NOC_USB_AXI_CBCR] = &gcc->gcc_sys_noc_usb_axi_cbcr,
+};
+
+static u32 *disp_gdsc[MAX_DISP_GDSC] = {
+	[DISP_CC_CORE_GDSC] = &disp_cc->mdss_core_gdscr,
+};
+
+static u32 *mdss_cbcr[MDSS_CLK_COUNT] = {
+	[GCC_DISP_AHB_CBCR] = &gcc->gcc_disp_ahb_cbcr,
+	[GCC_DISP_XO_CBCR] = &gcc->gcc_disp_xo_cbcr,
+	[GCC_DISP_HF_AXI_CBCR] = &gcc->gcc_disp_hf_axi_cbcr,
+	[DISP_CC_MDSS_AHB_CBCR] = &disp_cc->mdss_ahb_cbcr,
+	[DISP_CC_MDSS_MDP_CBCR] = &disp_cc->mdss_mdp_cbcr,
+	[DISP_CC_MDSS_VSYNC_CBCR] = &disp_cc->mdss_vsync_cbcr,
+	[DISP_CC_MDSS_RSCC_AHB_CBCR] = &disp_cc->mdss_rscc_ahb_cbcr,
+	[DISP_CC_MDSS_RSCC_VSYNC_CBCR] = &disp_cc->mdss_rscc_vsync_cbcr,
+	[DISP_CC_XO_CBCR] = &disp_cc->xo_cbcr,
+	[DISP_CC_MDSS_DPTX3_PIXEL0_CBCR] = &disp_cc->mdss_dptx3_pixel0_cbcr,
+	[DISP_CC_MDSS_DPTX3_LINK_CBCR] = &disp_cc->mdss_dptx3_link_cbcr,
+	[DISP_CC_MDSS_DPTX3_AUX_CBCR] = &disp_cc->mdss_dptx3_aux_cbcr,
+	[DISP_CC_MDSS_DPTX3_LINK_INTF_CBCR] = &disp_cc->mdss_dptx3_link_intf_cbcr,
+};
+
 static struct clock_freq_config pcie_core_cfg[] = {
 	{
 		.hz = 100 * MHz,
 		.src = SRC_GPLL0_MAIN_600MHZ,
 		.div = QCOM_CLOCK_DIV(6),
+	},
+};
+
+static struct clock_freq_config usb_core_cfg[] = {
+	{
+		.hz = CLK_200MHZ,
+		.src = SRC_GPLL0_MAIN_600MHZ,
+		.div = QCOM_CLOCK_DIV(3),
 	},
 };
 
@@ -249,37 +337,122 @@ void clock_configure_qspi(uint32_t hz)
 	clock_enable(&gcc->qspi_core_cbcr);
 }
 
+/* Helper function to get SE index within a wrap */
+static inline int get_qup_se_index(int qup)
+{
+	return qup % QUP_WRAP1_S0;
+}
+
+/* Helper function to get pointer to QUP SE clock structure */
+static void *get_qup_se_clk(int qup, int s)
+{
+	struct x1p42100_qupv3_wrap *wrap;
+	void *se_clk_array[8];
+
+	/* Determine which wrap based on qup value */
+	if (qup <= QUP_WRAP0_S7)
+		wrap = qup_wrap0_clk;
+	else if (qup <= QUP_WRAP1_S7)
+		wrap = qup_wrap1_clk;
+	else
+		wrap = qup_wrap2_clk;
+
+	/* Build array of pointers to SE clock structures */
+	se_clk_array[0] = &wrap->qupv3_s0;
+	se_clk_array[1] = &wrap->qupv3_s1;
+	se_clk_array[2] = &wrap->qupv3_s2;
+	se_clk_array[3] = &wrap->qupv3_s3;
+	se_clk_array[4] = &wrap->qupv3_s4;
+	se_clk_array[5] = &wrap->qupv3_s5;
+	se_clk_array[6] = &wrap->qupv3_s6;
+	se_clk_array[7] = &wrap->qupv3_s7;
+
+	return se_clk_array[s];
+}
+
 void clock_enable_qup(int qup)
 {
-	struct qupv3_clock *qup_clk;
-	int s = qup % QUP_WRAP1_S0, clk_en_off;
-	void *clk_br_en_ptr = NULL;	// Pointer to the correct apcs_clk_br_enX
-	qup_clk = qup < QUP_WRAP1_S0 ? &gcc->qup_wrap0_s[s] : qup < QUP_WRAP2_S0 ?
-		&gcc->qup_wrap1_s[s] : &gcc->qup_wrap2_s[s];
+	int s = get_qup_se_index(qup), clk_en_off;
+	void *clk_br_en_ptr = NULL;
+	u32 *cbcr;
 
 	if (qup <= QUP_WRAP0_S7) {
 		clk_en_off = QUPV3_WRAP0_CLK_ENA_S(s);
 		clk_br_en_ptr = &gcc->apcs_clk_br_en4;
-	} else if (qup >= QUP_WRAP1_S0 && qup <= QUP_WRAP1_S6) {
-		clk_en_off = QUPV3_WRAP1_CLK_ENA_S(s);
-		clk_br_en_ptr = &gcc->apcs_clk_br_en1;
-	} else if (qup >= QUP_WRAP2_S0 && qup <= QUP_WRAP2_S6) {
-		clk_en_off = QUPV3_WRAP2_CLK_ENA_S(s);
-		clk_br_en_ptr = &gcc->apcs_clk_br_en2;
-	} else if (qup == QUP_WRAP1_S7 || qup == QUP_WRAP2_S7) {
-		clk_en_off = qup == QUP_WRAP1_S7 ? QUPV3_WRAP1_SE7_CLK_ENA : QUPV3_WRAP2_SE7_CLK_ENA;
+	} else if (qup <= QUP_WRAP1_S7) {
+		clk_en_off = (qup == QUP_WRAP1_S7) ? QUPV3_WRAP1_SE7_CLK_ENA : QUPV3_WRAP1_CLK_ENA_S(s);
+		clk_br_en_ptr = (qup == QUP_WRAP1_S7) ? &gcc->apcs_clk_br_en2 : &gcc->apcs_clk_br_en1;
+	} else {
+		clk_en_off = (qup == QUP_WRAP2_S7) ? QUPV3_WRAP2_SE7_CLK_ENA : QUPV3_WRAP2_CLK_ENA_S(s);
 		clk_br_en_ptr = &gcc->apcs_clk_br_en2;
 	}
 
+	if (s == 2 || s == 3)
+		cbcr = &((struct qupv3_clock_v2 *)get_qup_se_clk(qup, s))->cbcr;
+	else
+		cbcr = &((struct qupv3_clock *)get_qup_se_clk(qup, s))->cbcr;
+
 	/* Only call if a valid pointer was assigned */
 	if (clk_br_en_ptr)
-		clock_enable_vote(&qup_clk->cbcr, clk_br_en_ptr, clk_en_off);
+		clock_enable_vote(cbcr, clk_br_en_ptr, clk_en_off);
+}
+
+/* Clock Root clock Generator with DFS Operations */
+void clock_configure_dfsr_table_x1p42100(int qup, struct clock_freq_config *clk_cfg,
+	uint32_t num_perfs)
+{
+	unsigned int idx;
+	int s = get_qup_se_index(qup);
+	uint32_t reg_val;
+	struct clock_rcg_dfsr *dfsr_clk;
+
+	/* Validate s value is within bounds */
+	if (s > 7) {
+		printk(BIOS_ERR, "Invalid QUP index: s=%d\n", s);
+		return;
+	}
+
+	/* Get DFSR clock pointer - cast based on SE type
+	 * (s2, s3 are qupv3_clock_v2, others are qupv3_clock)
+	 */
+	if (s == 2 || s == 3)
+		dfsr_clk = &((struct qupv3_clock_v2 *)get_qup_se_clk(qup, s))->dfsr_clk;
+	else
+		dfsr_clk = &((struct qupv3_clock *)get_qup_se_clk(qup, s))->dfsr_clk;
+
+	clrsetbits32(&dfsr_clk->cmd_dfsr,
+			BIT(CLK_CTL_CMD_RCG_SW_CTL_SHFT),
+			BIT(CLK_CTL_CMD_DFSR_SHFT));
+
+	for (idx = 0; idx < num_perfs; idx++) {
+		reg_val = (clk_cfg[idx].src << CLK_CTL_CFG_SRC_SEL_SHFT) |
+			(clk_cfg[idx].div << CLK_CTL_CFG_SRC_DIV_SHFT);
+
+		write32(&dfsr_clk->perf_dfsr[idx], reg_val);
+
+		if (clk_cfg[idx].m == 0)
+			continue;
+
+		setbits32(&dfsr_clk->perf_dfsr[idx], RCG_MODE_DUAL_EDGE << CLK_CTL_CFG_MODE_SHFT);
+
+		reg_val = clk_cfg[idx].m & CLK_CTL_RCG_MND_BMSK;
+		write32(&dfsr_clk->perf_m_dfsr[idx], reg_val);
+
+		reg_val = ~(clk_cfg[idx].n - clk_cfg[idx].m) & CLK_CTL_RCG_MND_BMSK;
+		write32(&dfsr_clk->perf_n_dfsr[idx], reg_val);
+
+		reg_val = ~(clk_cfg[idx].d_2) & CLK_CTL_RCG_MND_BMSK;
+		write32(&dfsr_clk->perf_d_dfsr[idx], reg_val);
+	}
 }
 
 void clock_configure_dfsr(int qup)
 {
-	clock_configure_dfsr_table(qup, qupv3_wrap_cfg,
-						ARRAY_SIZE(qupv3_wrap_cfg));
+	int s = get_qup_se_index(qup);
+	uint32_t qupv3_cfg_size = (s < 4) ? (ARRAY_SIZE(qupv3_wrap_cfg) - 1) :
+				ARRAY_SIZE(qupv3_wrap_cfg);
+
+	clock_configure_dfsr_table_x1p42100(qup, qupv3_wrap_cfg, qupv3_cfg_size);
 }
 static enum cb_err clock_configure_gpll0(void)
 {
@@ -339,6 +512,101 @@ void clock_configure_pcie(void)
 			pcie_core_cfg, PCIE_PHY_RCHNG_FREQ, ARRAY_SIZE(pcie_core_cfg));
 }
 
+enum cb_err clock_enable_usb_gdsc(enum clk_usb_gdsc gdsc_type)
+{
+	if (gdsc_type >= MAX_USB_GDSC)
+		return CB_ERR;
+
+	return enable_and_poll_gdsc_status(usb_gdsc[gdsc_type]);
+}
+
+enum cb_err clock_enable_disp_gdsc(enum clk_disp_gdsc gdsc_type)
+{
+	if (gdsc_type >= MAX_DISP_GDSC)
+		return CB_ERR;
+
+	return enable_and_poll_gdsc_status(disp_gdsc[gdsc_type]);
+}
+
+enum cb_err usb_clock_enable(enum clk_usb clk_type)
+{
+	if (clk_type >= USB_CLK_COUNT)
+		return CB_ERR;
+
+	return clock_enable(usb_mp_cbcr[clk_type]);
+}
+
+void usb_clock_reset(enum clk_usb clk_type, bool assert)
+{
+	clock_reset(usb_mp_cbcr[clk_type], assert);
+}
+
+enum cb_err usb_prim_clock_enable(enum clk_usb_prim clk_type)
+{
+	if (clk_type >= USB_PRIM_CLK_COUNT) {
+		printk(BIOS_ERR, "USB C0 clock enable failed: "
+			"clock type %d out of range\n", clk_type);
+		return CB_ERR;
+	}
+
+	return clock_enable(usb_prim_cbcr[clk_type]);
+}
+
+void usb_prim_clock_reset(enum clk_usb_prim clk_type, bool assert)
+{
+	clock_reset(usb_prim_cbcr[clk_type], assert);
+}
+
+enum cb_err usb_sec_clock_enable(enum clk_usb_sec clk_type)
+{
+	if (clk_type >= USB_SEC_CLK_COUNT) {
+		printk(BIOS_ERR, "USB C1 clock enable failed: "
+			"clock type %d out of range\n", clk_type);
+		return CB_ERR;
+	}
+
+	return clock_enable(usb_sec_cbcr[clk_type]);
+}
+
+void usb_sec_clock_reset(enum clk_usb_sec clk_type, bool assert)
+{
+	clock_reset(usb_sec_cbcr[clk_type], assert);
+}
+
+void clock_configure_usb(void)
+{
+	clock_configure(&gcc->usb30_mp_master_rcg,
+		usb_core_cfg, USB3_MASTER_CLK_MIN_FREQ_HZ, ARRAY_SIZE(usb_core_cfg));
+	clock_configure(&gcc->usb30_prim_master_rcg,
+		usb_core_cfg, USB3_MASTER_CLK_MIN_FREQ_HZ, ARRAY_SIZE(usb_core_cfg));
+	clock_configure(&gcc->usb30_sec_master_rcg,
+		usb_core_cfg, USB3_MASTER_CLK_MIN_FREQ_HZ, ARRAY_SIZE(usb_core_cfg));
+}
+
+enum cb_err usb_clock_configure_mux(enum clk_pipe_usb clk_type, u32 src_type)
+{
+	switch (clk_type) {
+	case USB3_PHY_PIPE_0:
+		write32(&gcc->gcc_usb3_mp_phy_pipe_0_muxr, src_type);
+		break;
+	case USB3_PHY_PIPE_1:
+		write32(&gcc->gcc_usb3_mp_phy_pipe_1_muxr, src_type);
+		break;
+	case USB3_PRIM_PHY_PIPE:
+		write32(&gcc->gcc_usb3_prim_phy_pipe_muxr, src_type);
+		break;
+	case USB3_SEC_PHY_PIPE:
+		write32(&gcc->gcc_usb3_sec_phy_pipe_muxr, src_type);
+		break;
+
+	default:
+		printk(BIOS_ERR, "Unhandled clk_type: %d, src_type: %u\n", clk_type, src_type);
+		return CB_ERR;
+	}
+
+	return CB_SUCCESS;
+}
+
 static enum cb_err pll_init_and_set(struct x1p42100_ncc0_clock *ncc0, u32 l_val)
 {
 	int ret;
@@ -381,6 +649,45 @@ static enum cb_err pll_init_and_set(struct x1p42100_ncc0_clock *ncc0, u32 l_val)
 	setbits64p(NCC0_NCC_CMU_NCC_CLK_CFG, BIT(SELCKMUXPLLFASTCLK));
 
 	return CB_SUCCESS;
+}
+
+enum cb_err disp_pll_init_and_set(struct x1p42100_disp_pll_clock *disp_pll, u32 l_val, u32 alpha_val)
+{
+	int ret;
+	struct alpha_pll_reg_val_config disp_pll_cfg = {0};
+
+	disp_pll_cfg.reg_l = &disp_pll->pll_l;
+	disp_pll_cfg.l_val = l_val;
+
+	disp_pll_cfg.reg_alpha = &disp_pll->pll_alpha;
+	disp_pll_cfg.alpha_val = alpha_val;
+
+	disp_pll_cfg.reg_user_ctl = &disp_pll->pll_user_ctl;
+	disp_pll_cfg.user_ctl_val = 0x1;
+
+	clock_configure_enable_gpll(&disp_pll_cfg, false, 0);
+
+	disp_pll_cfg.reg_mode = &disp_pll->pll_mode;
+	disp_pll_cfg.reg_opmode = &disp_pll->pll_opmode;
+	ret = lucidole_pll_enable(&disp_pll_cfg);
+	if (ret != CB_SUCCESS)
+		return CB_ERR;
+
+	return CB_SUCCESS;
+}
+
+enum cb_err mdss_clock_enable(enum clk_mdss clk_type)
+{
+	if (clk_type >= MDSS_CLK_COUNT)
+		return CB_ERR;
+
+	/* Enable clock */
+	return clock_enable(mdss_cbcr[clk_type]);
+}
+
+void enable_disp_clock_tcsr(void)
+{
+	write32(TCSR_GCC_EDP_CLKREF_EN_ADDR, 0x1);
 }
 
 static void speed_up_boot_cpu(void)

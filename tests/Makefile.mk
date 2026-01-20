@@ -24,6 +24,15 @@ TEST_CFLAGS += --coverage
 TEST_LDFLAGS += --coverage
 endif
 
+# Use system cmoka in default, or build from 3rdparty source code if requested
+USE_SYSTEM_CMOCKA ?= 1
+ifeq ($(USE_SYSTEM_CMOCKA),1)
+ifeq ($(shell $(HOSTPKG_CONFIG) --exists cmocka || echo 1),1)
+$(warning No system cmocka, build from 3rdparty instead...)
+USE_SYSTEM_CMOCKA=0
+endif
+endif
+
 stages := decompressor bootblock romstage smm verstage
 stages += ramstage rmodule postcar libagesa
 
@@ -140,8 +149,8 @@ clean-junit.xml-unit-tests:
 ifeq ($(COV),1)
 coverage-report:
 	lcov -o $(testobj)/tests.info -c -d $(testobj) --exclude '$(testsrc)/*'
-	genhtml -q -o $(testobj)/$(coverage_dir) -t "coreboot unit tests" \
-	-s $(testobj)/tests.info
+	# TODO: fix inconsistent and corrupt error reports
+	# genhtml --ignore-errors inconsistent,corrupt -q -o $(testobj)/$(coverage_dir) -t "coreboot unit tests" -s $(testobj)/tests.info
 
 clean-coverage-report:
 	rm -Rf $(testobj)/$(coverage_dir)
@@ -186,6 +195,7 @@ help-unit-tests help::
 	@echo  '*** coreboot unit-tests targets ***'
 	@echo  '  Use "COV=1 make [target]" to enable code coverage for unit tests'
 	@echo  '  Use "GDB_DEBUG=1 make [target]" to build with debug symbols'
+	@echo  '  Use "USE_SYSTEM_CMOCKA=0 make [target]" to build Cmocka from source'
 	@echo  '  unit-tests            - Run all unit-tests from tests/'
 	@echo  '  clean-unit-tests      - Remove unit-tests build artifacts'
 	@echo  '  list-unit-tests       - List all unit-tests'

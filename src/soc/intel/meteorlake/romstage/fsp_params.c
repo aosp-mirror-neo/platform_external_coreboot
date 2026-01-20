@@ -36,35 +36,40 @@
 #define FSP_CLK_LAN			0x70
 #define FSP_CLK_FREE_RUNNING		0x80
 
+static void configure_rp_clocks(FSP_M_CONFIG *m_cfg,
+				const struct pcie_rp_config *rp_cfg,
+				size_t index)
+{
+	static unsigned int clk_req_mapping = 0;
+
+	if (CONFIG(SOC_INTEL_COMPLIANCE_TEST_MODE))
+		return;
+	if (rp_cfg->flags & PCIE_RP_CLK_SRC_UNUSED)
+		return;
+	if (!rp_cfg->flags && rp_cfg->clk_src == 0 && rp_cfg->clk_req == 0) {
+		printk(BIOS_WARNING, "Missing root port %zu clock structure definition\n",
+			index + 1);
+		return;
+	}
+	if (!(rp_cfg->flags & PCIE_RP_CLK_REQ_UNUSED)) {
+		if (clk_req_mapping & BIT(rp_cfg->clk_req)) {
+			printk(BIOS_WARNING,
+			       "Found overlapped clkreq assignment on clk req %u\n",
+			       rp_cfg->clk_req);
+		}
+		m_cfg->PcieClkSrcClkReq[rp_cfg->clk_src] = rp_cfg->clk_req;
+		clk_req_mapping |= BIT(rp_cfg->clk_req);
+	}
+	m_cfg->PcieClkSrcUsage[rp_cfg->clk_src] = index;
+}
+
 static void pcie_rp_init(FSP_M_CONFIG *m_cfg, uint32_t en_mask,
 			const struct pcie_rp_config *cfg, size_t cfg_count)
 {
-	size_t i;
-	static unsigned int clk_req_mapping = 0;
-
-	for (i = 0; i < cfg_count; i++) {
-		if (CONFIG(SOC_INTEL_COMPLIANCE_TEST_MODE)) {
-			m_cfg->PcieClkSrcUsage[i] = FSP_CLK_FREE_RUNNING;
-			continue;
-		}
+	for (size_t i = 0; i < cfg_count; i++) {
 		if (!(en_mask & BIT(i)))
 			continue;
-		if (cfg[i].flags & PCIE_RP_CLK_SRC_UNUSED)
-			continue;
-		if (!cfg[i].flags && cfg[i].clk_src == 0 && cfg[i].clk_req == 0) {
-			printk(BIOS_WARNING, "Missing root port clock structure definition\n");
-			continue;
-		}
-
-		if (!(cfg[i].flags & PCIE_RP_CLK_REQ_UNUSED)) {
-			if (clk_req_mapping & (1 << cfg[i].clk_req))
-				printk(BIOS_WARNING,
-				       "Found overlapped clkreq assignment on clk req %d\n",
-				       cfg[i].clk_req);
-			m_cfg->PcieClkSrcClkReq[cfg[i].clk_src] = cfg[i].clk_req;
-			clk_req_mapping |= 1 << cfg[i].clk_req;
-		}
-		m_cfg->PcieClkSrcUsage[cfg[i].clk_src] = i;
+		configure_rp_clocks(m_cfg, &cfg[i], i);
 	}
 }
 
@@ -76,7 +81,9 @@ static void fill_fspm_pcie_rp_params(FSP_M_CONFIG *m_cfg,
 	uint8_t max_clock = get_max_pcie_clock();
 
 	for (i = 0; i < max_clock; i++) {
-		if (config->pcie_clk_config_flag[i] & PCIE_CLK_FREE_RUNNING)
+		if (CONFIG(SOC_INTEL_COMPLIANCE_TEST_MODE))
+			m_cfg->PcieClkSrcUsage[i] = FSP_CLK_FREE_RUNNING;
+		else if (config->pcie_clk_config_flag[i] & PCIE_CLK_FREE_RUNNING)
 			m_cfg->PcieClkSrcUsage[i] = FSP_CLK_FREE_RUNNING;
 		else if (config->pcie_clk_config_flag[i] & PCIE_CLK_LAN)
 			m_cfg->PcieClkSrcUsage[i] = FSP_CLK_LAN;
@@ -116,7 +123,7 @@ static void fill_fspm_igd_params(FSP_M_CONFIG *m_cfg,
 		[DDI_PORT_3] = {&m_cfg->DdiPort3Ddc, &m_cfg->DdiPort3Hpd},
 		[DDI_PORT_4] = {&m_cfg->DdiPort4Ddc, &m_cfg->DdiPort4Hpd},
 	};
-	m_cfg->InternalGfx = !CONFIG(SOC_INTEL_DISABLE_IGD) && is_devfn_enabled(PCI_DEVFN_IGD);
+	m_cfg->InternalGfx = get_uint_option("igd_enabled", !CONFIG(SOC_INTEL_DISABLE_IGD)) && is_devfn_enabled(PCI_DEVFN_IGD);
 	if (m_cfg->InternalGfx) {
 		/* IGD is enabled, set IGD stolen size to 128MB. */
 		m_cfg->IgdDvmt50PreAlloc = get_uint_option("igd_dvmt_prealloc", IGD_SM_128MB);
@@ -394,7 +401,7 @@ static void fill_fspm_ibecc_params(FSP_M_CONFIG *m_cfg,
 	}
 }
 
-static void fill_fsps_acoustic_params(FSP_M_CONFIG *m_cfg,
+static void fill_fspm_acoustic_params(FSP_M_CONFIG *m_cfg,
 		const struct soc_intel_meteorlake_config *config)
 {
 	if (!config->enable_acoustic_noise_mitigation)
@@ -431,7 +438,7 @@ static void soc_memory_init_params(FSP_M_CONFIG *m_cfg,
 		fill_fspm_trace_params,
 		fill_fspm_vr_config_params,
 		fill_fspm_ibecc_params,
-		fill_fsps_acoustic_params,
+		fill_fspm_acoustic_params,
 	};
 
 	for (size_t i = 0; i < ARRAY_SIZE(fill_fspm_params); i++)

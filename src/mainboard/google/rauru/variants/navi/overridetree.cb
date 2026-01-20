@@ -5,6 +5,11 @@ fw_config
 		option PRESENT	1
 		option ABSENT	0
 	end
+	field AUDIO_AMPLIFIER 28 29
+		option AUDIO_AMPLIFIER_NAU8318 0
+		option AUDIO_AMPLIFIER_TAS2563 1
+		option AUDIO_AMPLIFIER_ALC5645 2
+	end
 end
 
 chip soc/mediatek/mt8196

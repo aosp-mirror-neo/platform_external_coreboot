@@ -3,7 +3,7 @@
 # TODO: Evaluate what can be moved to a common directory
 # TODO: Update for Glinda
 
-config SOC_AMD_GLINDA
+config SOC_AMD_GLINDA_BASE
 	bool
 	select ACPI_SOC_NVS
 	select ARCH_X86
@@ -92,10 +92,23 @@ config SOC_AMD_GLINDA
 	select X86_AMD_FIXED_MTRRS
 	select X86_INIT_NEED_1_SIPI
 	select HAVE_X86_64_SUPPORT
+	select SOC_AMD_SUPPORTS_WARM_RESET
 	help
 	  AMD Glinda support
 
-if SOC_AMD_GLINDA
+config SOC_AMD_GLINDA
+	bool
+	select SOC_AMD_GLINDA_BASE
+	help
+	  AMD Glinda support
+
+config SOC_AMD_FAEGAN
+	bool
+	select SOC_AMD_GLINDA_BASE
+	help
+	  AMD Faegan support
+
+if SOC_AMD_GLINDA_BASE
 
 config CHIPSET_DEVICETREE
 	string
@@ -450,4 +463,4 @@ config RWB_REGION_ONLY
 
 endif # VBOOT_SLOTS_RW_AB && VBOOT_STARTS_BEFORE_BOOTBLOCK
 
-endif # SOC_AMD_GLINDA
+endif # SOC_AMD_GLINDA_BASE

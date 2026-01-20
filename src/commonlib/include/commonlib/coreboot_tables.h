@@ -90,12 +90,14 @@ enum {
 	LB_TAG_EFI_FW_INFO		= 0x0045,
 	LB_TAG_CAPSULE			= 0x0046,
 	LB_TAG_CFR_ROOT			= 0x0047,
+	LB_TAG_ROOT_BRIDGE_INFO		= 0x0048,
 	/* The following options are CMOS-related */
 	LB_TAG_CMOS_OPTION_TABLE	= 0x00c8,
 	LB_TAG_OPTION			= 0x00c9,
 	LB_TAG_OPTION_ENUM		= 0x00ca,
 	LB_TAG_OPTION_DEFAULTS		= 0x00cb,
 	LB_TAG_OPTION_CHECKSUM		= 0x00cc,
+	LB_TAG_BOOT_MODE		= 0x00cd,
 };
 
 /* All table entry base addresses and sizes must be 4-byte aligned. */
@@ -142,7 +144,12 @@ struct lb_memory_range {
 #define LB_MEM_NVS		 4	/* ACPI NVS Memory */
 #define LB_MEM_UNUSABLE		 5	/* Unusable address space */
 #define LB_MEM_VENDOR_RSVD	 6	/* Vendor Reserved */
-#define LB_MEM_TABLE		16    /* Ram configuration tables are kept in */
+/*
+ * The memory type [1 ... 16) needs to match
+ * https://uefi.org/htmlspecs/ACPI_Spec_6_4_html/15_System_Address_Map_Interfaces/Sys_Address_Map_Interfaces.html
+ */
+#define LB_MEM_TABLE		16	/* Ram configuration tables are kept in */
+#define LB_MEM_TAG		17	/* Armv9 tag storage for MTE */
 #define LB_MEM_SOFT_RESERVED	0xefffffff /* Specific purpose memory */
 };
 
@@ -280,7 +287,8 @@ enum lb_fb_orientation {
 
 struct lb_framebuffer_flags {
 	uint8_t has_external_display : 1;
-	uint8_t reserved : 7;
+	uint8_t has_dual_pipe : 1;
+	uint8_t reserved : 6;
 };
 
 struct lb_framebuffer {
@@ -554,7 +562,7 @@ struct lb_smmstorev2 {
 	uint32_t com_buffer_size;	/* Size of the communication buffer in bytes */
 	uint8_t apm_cmd;		/* The command byte to write to the APM I/O port */
 	uint8_t unused[3];		/* Set to zero */
-	uint64_t mmap_addr;		/* 64-bit MMIO address of the store for read only access.
+	lb_uint64_t mmap_addr;		/* 64-bit MMIO address of the store for read only access.
 					   Introduced after the initial implementation. Users of
 					   this table must check the 'size' field to detect if its
 					   written out by coreboot. */
@@ -619,6 +627,24 @@ struct lb_cfr {
 	uint32_t version;
 	uint32_t checksum;	/* Checksum of the variable payload. */
 	/* struct lb_cfr_option_form		forms[] */
+};
+
+enum boot_mode_t {
+	LB_BOOT_MODE_NORMAL,
+	LB_BOOT_MODE_LOW_BATTERY,
+	LB_BOOT_MODE_OFFMODE_CHARGING,
+};
+
+/*
+ * Boot Mode: Pass the platform boot mode information to payload about
+ * booting in low-battery mode or off-mode charging. This information
+ * is useful for payload to implement charger driver.
+ */
+struct lb_boot_mode {
+	uint32_t tag;
+	uint32_t size;
+
+	enum boot_mode_t boot_mode;
 };
 
 #endif

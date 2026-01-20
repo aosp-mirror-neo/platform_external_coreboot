@@ -14,6 +14,8 @@
  */
 
 #include <acpi/acpi.h>
+#include <acpi/acpi_apei.h>
+#include <acpi/acpi_gnvs.h>
 #include <acpi/acpi_iort.h>
 #include <acpi/acpi_ivrs.h>
 #include <acpi/acpigen.h>
@@ -25,7 +27,11 @@
 #include <device/device.h>
 #include <device/mmio.h>
 #include <device/pci.h>
+#if CONFIG(AMD_CRB_FTPM)
+#include <drivers/amd/ftpm/tpm.h>
+#else
 #include <drivers/crb/tpm.h>
+#endif
 #include <drivers/uart/pl011.h>
 #include <security/tpm/tss.h>
 #include <string.h>
@@ -258,7 +264,7 @@ static void acpi_create_tpm2(acpi_header_t *header, void *unused)
 	if (tlcl_get_family() != TPM_2)
 		return;
 
-	if (CONFIG(CRB_TPM) && !(CONFIG(SPI_TPM) || CONFIG(I2C_TPM) || CONFIG(MEMORY_MAPPED_TPM)))
+	if ((CONFIG(CRB_TPM) || CONFIG(AMD_CRB_FTPM)) && !(CONFIG(SPI_TPM) || CONFIG(I2C_TPM) || CONFIG(MEMORY_MAPPED_TPM)))
 		if (!crb_tpm_is_active())
 			return;
 
@@ -279,14 +285,16 @@ static void acpi_create_tpm2(acpi_header_t *header, void *unused)
 
 	/* Hard to detect for coreboot. Just set it to 0 */
 	tpm2->platform_class = 0;
-	if (CONFIG(CRB_TPM)) {
-		/* Must be set to 7 for CRB Support */
+
+	if (CONFIG(AMD_CRB_FTPM) && crb_tpm_is_active()) {
 		tpm2->control_area = crb_tpm_base_address() + 0x40;
-		tpm2->start_method = 7;
+		tpm2->start_method = ACPI_TPM2_SM_ACPI_START;
+	} else if (CONFIG(CRB_TPM) && crb_tpm_is_active()) {
+		tpm2->control_area = crb_tpm_base_address() + 0x40;
+		tpm2->start_method = ACPI_TPM2_SM_CRB;
 	} else {
-		/* Must be set to 0 for FIFO interface support */
 		tpm2->control_area = 0;
-		tpm2->start_method = 6;
+		tpm2->start_method = ACPI_TPM2_SM_MMIO_TIS;
 	}
 	memset(tpm2->msp, 0, sizeof(tpm2->msp));
 
@@ -646,7 +654,7 @@ void acpi_create_einj(acpi_einj_t *einj, uintptr_t addr, u8 actions)
 			.action = SET_ERROR_TYPE_WITH_ADDRESS,
 			.instruction = WRITE_REGISTER,
 			.flags = FLAG_PRESERVE,
-			.reg = EINJ_REG_MEMORY((u64)(uintptr_t)&einj_smi->setaddrtable),
+			.reg = EINJ_REG_MEMORY((u64)(uintptr_t)&einj_smi->set_addr_table),
 			.value = 1,
 			.mask = 0xffffffff
 		}
@@ -934,14 +942,9 @@ static void acpi_create_facs(void *header)
 {
 	acpi_facs_t *facs = header;
 
+	memset(facs, 0, sizeof(acpi_facs_t));
 	memcpy(facs->signature, "FACS", 4);
 	facs->length = sizeof(acpi_facs_t);
-	facs->hardware_signature = 0;
-	facs->firmware_waking_vector = 0;
-	facs->global_lock = 0;
-	facs->flags = 0;
-	facs->x_firmware_waking_vector_l = 0;
-	facs->x_firmware_waking_vector_h = 0;
 	facs->version = get_acpi_table_revision(FACS);
 }
 
@@ -1030,7 +1033,7 @@ unsigned long acpi_create_hest_error_source(acpi_hest_t *hest,
 		memset(pos, 0, sizeof(acpi_hest_hen_t));
 		hen->type = 3;		/* SCI? */
 		hen->length = sizeof(acpi_hest_hen_t);
-		hen->conf_we = 0;	/* Configuration Write Enable. */
+		hen->conf_write_enable = 0;
 		hen->poll_interval = 0;
 		hen->vector = 0;
 		hen->sw2poll_threshold_val = 0;
@@ -1062,20 +1065,32 @@ unsigned long acpi_create_hest_error_source(acpi_hest_t *hest,
 }
 
 /* ACPI 4.0 */
-void acpi_write_hest(acpi_hest_t *hest,
-		     unsigned long (*acpi_fill_hest)(acpi_hest_t *hest))
+static void acpi_create_hest(acpi_header_t *header, void *unused)
 {
-	acpi_header_t *header = &(hest->header);
+	if (!CONFIG(ACPI_HEST))
+		return;
+
+	/* Reserve memory for Enhanced error logging */
+	void *log_mem = cbmem_add(CBMEM_ID_ACPI_HEST, CONFIG_ACPI_HEST_ERROR_LOG_BUFFER_SIZE);
+	if (!log_mem) {
+		printk(BIOS_ERR, "Unable to allocate HEST memory\n");
+		return;
+	}
+	printk(BIOS_DEBUG, "HEST elog_addr: %p, size:%d\n", log_mem,
+		CONFIG_ACPI_HEST_ERROR_LOG_BUFFER_SIZE);
+
+	acpi_hest_t *hest = (acpi_hest_t *)header;
+	uintptr_t current = (uintptr_t)(hest + 1);
 
 	memset(hest, 0, sizeof(acpi_hest_t));
 
 	if (acpi_fill_header(header, "HEST", HEST, sizeof(acpi_hest_t)) != CB_SUCCESS)
 		return;
 
-	acpi_fill_hest(hest);
+	current = acpi_soc_fill_hest(hest, current, log_mem);
 
-	/* Calculate checksums. */
-	header->checksum = acpi_checksum((void *)hest, header->length);
+	/* (Re)calculate length. */
+	header->length = current - (uintptr_t)hest;
 }
 
 /* ACPI 3.0b */
@@ -1456,6 +1471,7 @@ unsigned long write_acpi_tables(const unsigned long start)
 		{ acpi_create_tpm2, NULL, sizeof(acpi_tpm2_t) },
 		{ acpi_create_lpit, NULL, sizeof(acpi_lpit_t) },
 		{ acpi_create_madt, NULL, sizeof(acpi_header_t) },
+		{ acpi_create_hest, NULL, sizeof(acpi_hest_t) },
 		{ acpi_create_bert, NULL, sizeof(acpi_bert_t) },
 		{ acpi_create_spcr, NULL, sizeof(acpi_spcr_t) },
 		{ acpi_create_gtdt, NULL, sizeof(acpi_gtdt_t) },

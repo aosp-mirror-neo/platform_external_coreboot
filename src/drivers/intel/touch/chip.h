@@ -4,6 +4,8 @@
 #define __DRIVERS_INTEL_TOUCH_CHIP_H__
 
 #include <acpi/acpi_device.h>
+#include <commonlib/bsd/helpers.h>
+#include <device/i2c.h>
 
 #define INTEL_THC0_NAME "THC0"
 #define INTEL_THC1_NAME "THC1"
@@ -13,6 +15,15 @@ struct intel_thc_hidi2c_dev_info {
 	uint64_t addr;
 	/* Used in THC_HID_I2C mode */
 	uint32_t descriptor_address;
+	/*
+	 * connection_speed: Indicates a recommended speed for this device;
+	 * Otherwise, if not specified, use the speed setting from the platform.
+	 */
+	enum i2c_speed connection_speed;
+	/* Maximum Frame Size Value: FSVL; FSEN will be set if FSVL has non-zero value */
+	uint64_t max_frame_size_value;
+	/* Interrupt delay value: INDV; INDE will be set if INDV has non-zero value */
+	uint64_t interrupt_delay_value;
 };
 
 struct intel_thc_hidspi_dev_info {
@@ -31,6 +42,11 @@ struct intel_thc_hidspi_dev_info {
 	/* Touch Host Controller HID Over SPI Write Opcode */
 	uint32_t write_opcode;
 
+	/*
+	 * connection_speed: indicates a recommended speed for this device;
+	 * otherwise 0 = use speed setting from the platform. unit = Hz.
+	 */
+	uint64_t connection_speed;
 };
 
 union intel_thc_dev_intf_info {
@@ -48,7 +64,12 @@ struct intel_thc_dev_info {
 
 struct intel_thc_hidi2c_info {
 	/* Device connection speed in Hz */
-	uint64_t connection_speed;
+	enum i2c_speed connection_speed;
+	/*
+	 * This maps SoC specific function for converting speed enum to the actual
+	 * value for the configuration register.
+	 */
+	uint64_t (*get_soc_i2c_bus_speed_val_func)(enum i2c_speed speed);
 	/* Device address mode */
 	uint64_t addr_mode;
 	/* Standard Mode (100 kbit/s) Serial Clock Line HIGH Period */
@@ -97,7 +118,7 @@ struct intel_thc_hidspi_info {
 	/*
 	 * Touch Host Controller HID Over SPI Connection Speed
 	 *
-	 * HID Over SPI Connection Speed - SPI Frequency
+	 * HID Over SPI Connection Speed - SPI Frequency; unit = Hz
 	 */
 	uint32_t connection_speed;
 
@@ -157,10 +178,14 @@ struct intel_thc_hidspi_info {
 enum intel_touch_device {
 	TH_SENSOR_NONE,
 	TH_SENSOR_WACOM,    /* BOM22 for SPI only */
+	/*
+	 * TH_SENSOR_ELAN: the ELAN device for Intel's RVPs (default for ELAN)
+	 * TH_SENSOR_ELAN_REX: the devece used in Google Rex; requires a special cable for Intel's RVP
+	 */
 	TH_SENSOR_ELAN,     /* BOM36 for SPI and BOM37 for I2C */
+	TH_SENSOR_ELAN_REX, /* ELAN9006 for SPI and ELAN6918 for I2C */
 	TH_SENSOR_HYNITRON, /* NYITRON for I2C only  */
 	TH_SENSOR_GENERIC,  /* for device properity thru devicetree */
-	TH_SENSOR_MAX
 };
 
 /*

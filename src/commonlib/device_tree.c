@@ -116,10 +116,11 @@ int fdt_next_property(const void *blob, uint32_t offset,
 		      struct fdt_property *prop)
 {
 	struct fdt_header *header = (struct fdt_header *)blob;
-	uint32_t *ptr = (uint32_t *)(((uint8_t *)blob) + offset);
 
 	// skip NOP tokens
 	offset += fdt_skip_nops(blob, offset);
+
+	uint32_t *ptr = (uint32_t *)(((uint8_t *)blob) + offset);
 
 	int index = 0;
 	if (be32toh(ptr[index++]) != FDT_TOKEN_PROPERTY)
@@ -766,12 +767,12 @@ bool fdt_is_valid(const void *blob)
 
 struct device_tree *fdt_unflatten(const void *blob)
 {
-	struct device_tree *tree = xzalloc(sizeof(*tree));
-	const struct fdt_header *header = (const struct fdt_header *)blob;
-	tree->header = header;
-
 	if (!fdt_is_valid(blob))
 		return NULL;
+
+	const struct fdt_header *header = blob;
+	struct device_tree *tree = xzalloc(sizeof(*tree));
+	tree->header = header;
 
 	uint32_t struct_offset = be32toh(header->structure_offset);
 	uint32_t strings_offset = be32toh(header->strings_offset);
@@ -1533,21 +1534,12 @@ void dt_add_u64_prop(struct device_tree_node *node, const char *name, u64 val)
 	dt_add_bin_prop(node, name, val_ptr, sizeof(*val_ptr));
 }
 
-/*
- * Add a 'reg' address list property to a node, or update it if it exists.
- *
- * @param node		The device tree node to add to.
- * @param regions       Array of address values to be stored in the property.
- * @param sizes		Array of corresponding size values to 'addrs'.
- * @param count		Number of values in 'addrs' and 'sizes' (must be equal).
- * @param addr_cells	Value of #address-cells property valid for this node.
- * @param size_cells	Value of #size-cells property valid for this node.
- */
-void dt_add_reg_prop(struct device_tree_node *node, u64 *addrs, u64 *sizes,
-		     int count, u32 addr_cells, u32 size_cells)
+static void dt_add_addr_and_size_prop(struct device_tree_node *node, const char *prop_name,
+				      const u64 *addrs, const u64 *sizes, int count,
+				      u32 addr_cells, u32 size_cells)
 {
 	int i;
-	size_t length = (addr_cells + size_cells) * sizeof(u32) * count;
+	size_t length = (size_t)(addr_cells + size_cells) * sizeof(u32) * count;
 	u8 *data = xmalloc(length);
 	u8 *cur = data;
 
@@ -1558,7 +1550,40 @@ void dt_add_reg_prop(struct device_tree_node *node, u64 *addrs, u64 *sizes,
 		cur += size_cells * sizeof(u32);
 	}
 
-	dt_add_bin_prop(node, "reg", data, length);
+	dt_add_bin_prop(node, prop_name, data, length);
+}
+
+/*
+ * Add a 'reg' address list property to a node, or update it if it exists.
+ *
+ * @param node		The device tree node to add to.
+ * @param regions       Array of address values to be stored in the property.
+ * @param sizes		Array of corresponding size values to 'addrs'.
+ * @param count		Number of values in 'addrs' and 'sizes' (must be equal).
+ * @param addr_cells	Value of #address-cells property valid for this node.
+ * @param size_cells	Value of #size-cells property valid for this node.
+ */
+void dt_add_reg_prop(struct device_tree_node *node, const u64 *addrs, const u64 *sizes,
+		     int count, u32 addr_cells, u32 size_cells)
+{
+	dt_add_addr_and_size_prop(node, "reg", addrs, sizes, count, addr_cells, size_cells);
+}
+
+/*
+ * Add a 'iommu-addresses' address list property to a node, or update it if it exists.
+ *
+ * @param node		The device tree node to add to.
+ * @param regions       Array of address values to be stored in the property.
+ * @param sizes		Array of corresponding size values to 'addrs'.
+ * @param count		Number of values in 'addrs' and 'sizes' (must be equal).
+ * @param addr_cells	Value of #address-cells property valid for this node.
+ * @param size_cells	Value of #size-cells property valid for this node.
+ */
+void dt_add_iommu_addr_prop(struct device_tree_node *node, const u64 *addrs, const u64 *sizes,
+			    int count, u32 addr_cells, u32 size_cells)
+{
+	dt_add_addr_and_size_prop(node, "iommu-addresses", addrs, sizes, count, addr_cells,
+				  size_cells);
 }
 
 /*
@@ -2124,4 +2149,49 @@ int dt_apply_overlay(struct device_tree *tree, struct device_tree *overlay)
 	}
 
 	return 0;
+}
+
+bool dt_is_overlay(struct device_tree *tree)
+{
+	/* The actual overlaid nodes/props are in an __overlay__ child node. */
+	const char * const overlay_path[] = { "__overlay__", NULL };
+	struct device_tree_node *fragment;
+
+	if (!tree)
+		return false;
+
+	list_for_each(fragment, tree->root->children, list_node)
+		if (dt_find_node(fragment, overlay_path, NULL, NULL, 0))
+			return true;
+
+	return false;
+}
+
+struct device_tree_node *dt_add_reserved_memory_region(struct device_tree *tree,
+		      const char *name, const char *compatible, uint64_t addr, uint64_t size,
+		      bool nomap)
+{
+	uint32_t addr_cells, size_cells;
+	const char *path[] = { "reserved-memory", name, NULL };
+
+	/* Find or create the node. Using 1 for the 'create' argument. */
+	struct device_tree_node *node = dt_find_node(tree->root, path,
+						     &addr_cells, &size_cells, 1);
+	if (!node) {
+		printk(BIOS_ERR, "Failed to create reserved-memory node: %s\n", name);
+		return NULL;
+	}
+
+	/* Add the compatible string if provided */
+	if (compatible)
+		dt_add_string_prop(node, "compatible", compatible);
+
+	/* Always add the reg property */
+	dt_add_reg_prop(node, &addr, &size, 1, addr_cells, size_cells);
+
+	/* Add no-map if requested */
+	if (nomap)
+		dt_add_bin_prop(node, "no-map", NULL, 0);
+
+	return node;
 }

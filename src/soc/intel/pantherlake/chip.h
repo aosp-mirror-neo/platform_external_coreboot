@@ -12,12 +12,12 @@
 #include <intelblocks/power_limit.h>
 #include <intelblocks/pcie_rp.h>
 #include <intelblocks/tcss.h>
+#include <intelblocks/usb.h>
 #include <soc/gpe.h>
 #include <soc/pci_devs.h>
 #include <soc/pmc.h>
 #include <soc/serialio.h>
 #include <soc/tcss.h>
-#include <soc/usb.h>
 #include <stdint.h>
 
 /* Define config parameters for In-Band ECC (IBECC). */
@@ -53,11 +53,12 @@ enum soc_intel_pantherlake_sagv_gears {
 };
 
 enum soc_intel_pantherlake_power_limits {
-	PTL_U_1_CORE,
-	PTL_U_2_CORE,
-	PTL_H_1_CORE,
-	PTL_H_2_CORE,
-	PTL_H_3_CORE,
+	PTL_CORE_1,
+	PTL_CORE_2,
+	PTL_CORE_3,
+	PTL_CORE_4,
+	PTL_CORE_5,
+	WCL_CORE,
 	PTL_POWER_LIMITS_COUNT,
 };
 
@@ -69,12 +70,30 @@ enum soc_intel_pantherlake_cpu_tdps {
 };
 
 enum soc_intel_pantherlake_sku {
-	PTL_H404_SKU,
-	PTL_H12XE_SKU,
-	PTL_H484_SKU,
-	PTL_H4XE_SKU,
-	PTL_H204_SKU,
-	MAX_PTL_SKUS
+	PTL_SKU_1,
+	PTL_SKU_2,
+	PTL_SKU_3,
+	PTL_SKU_4,
+	PTL_SKU_5,
+	PTL_SKU_6,
+	PTL_SKU_7,
+	WCL_SKU_1,
+	WCL_SKU_2,
+	WCL_SKU_3,
+	WCL_SKU_4,
+	WCL_SKU_5,
+	MAX_PTL_SKUS,
+};
+
+/* Thermal Design Current for different SKUs */
+enum soc_intel_pantherlake_tdc {
+	PTL_TDC_1,
+	PTL_TDC_2,
+	PTL_TDC_3,
+	PTL_TDC_4,
+	PTL_TDC_5,
+	WCL_TDC_1,
+	MAX_PTL_TDC
 };
 
 /* Mapping of different SKUs based on CPU ID and TDP values */
@@ -83,18 +102,27 @@ static const struct soc_intel_pantherlake_power_map {
 	enum soc_intel_pantherlake_power_limits limits;
 	enum soc_intel_pantherlake_cpu_tdps cpu_tdp;
 	enum soc_intel_pantherlake_sku sku;
+	enum soc_intel_pantherlake_tdc tdc;
 } cpuid_to_ptl[] = {
-	{ PCI_DID_INTEL_PTL_U_ID_1, PTL_U_1_CORE, TDP_15W, PTL_H404_SKU },
-	{ PCI_DID_INTEL_PTL_U_ID_2, PTL_U_2_CORE, TDP_15W, PTL_H204_SKU },
-	{ PCI_DID_INTEL_PTL_U_ID_3, PTL_U_2_CORE, TDP_15W, PTL_H404_SKU },
-	{ PCI_DID_INTEL_PTL_H_ID_1, PTL_H_1_CORE, TDP_25W, PTL_H12XE_SKU },
-	{ PCI_DID_INTEL_PTL_H_ID_2, PTL_H_1_CORE, TDP_25W, PTL_H484_SKU },
-	{ PCI_DID_INTEL_PTL_H_ID_3, PTL_H_2_CORE, TDP_25W, PTL_H12XE_SKU },
-	{ PCI_DID_INTEL_PTL_H_ID_4, PTL_H_2_CORE, TDP_25W, PTL_H12XE_SKU },
-	{ PCI_DID_INTEL_PTL_H_ID_5, PTL_H_2_CORE, TDP_25W, PTL_H4XE_SKU },
-	{ PCI_DID_INTEL_PTL_H_ID_6, PTL_H_2_CORE, TDP_25W, PTL_H4XE_SKU },
-	{ PCI_DID_INTEL_PTL_H_ID_7, PTL_H_2_CORE, TDP_25W, PTL_H4XE_SKU },
-	{ PCI_DID_INTEL_PTL_H_ID_8, PTL_H_2_CORE, TDP_25W, PTL_H12XE_SKU },
+	{ PCI_DID_INTEL_PTL_U_ID_1, PTL_CORE_1, TDP_15W, PTL_SKU_1, PTL_TDC_1 },
+	{ PCI_DID_INTEL_PTL_U_ID_1, PTL_CORE_1, TDP_25W, PTL_SKU_1, PTL_TDC_2 },
+	{ PCI_DID_INTEL_PTL_U_ID_2, PTL_CORE_2, TDP_15W, PTL_SKU_5, PTL_TDC_1 },
+	{ PCI_DID_INTEL_PTL_U_ID_2, PTL_CORE_2, TDP_25W, PTL_SKU_5, PTL_TDC_2 },
+	{ PCI_DID_INTEL_PTL_U_ID_3, PTL_CORE_1, TDP_15W, PTL_SKU_1, PTL_TDC_1 },
+	{ PCI_DID_INTEL_PTL_U_ID_3, PTL_CORE_1, TDP_25W, PTL_SKU_1, PTL_TDC_2 },
+	{ PCI_DID_INTEL_PTL_H_ID_1, PTL_CORE_3, TDP_25W, PTL_SKU_2, PTL_TDC_3 },
+	{ PCI_DID_INTEL_PTL_H_ID_2, PTL_CORE_3, TDP_25W, PTL_SKU_3, PTL_TDC_4 },
+	{ PCI_DID_INTEL_PTL_H_ID_3, PTL_CORE_4, TDP_25W, PTL_SKU_6, PTL_TDC_3 },
+	{ PCI_DID_INTEL_PTL_H_ID_4, PTL_CORE_4, TDP_25W, PTL_SKU_6, PTL_TDC_3 },
+	{ PCI_DID_INTEL_PTL_H_ID_5, PTL_CORE_4, TDP_25W, PTL_SKU_4, PTL_TDC_5 },
+	{ PCI_DID_INTEL_PTL_H_ID_6, PTL_CORE_4, TDP_25W, PTL_SKU_4, PTL_TDC_5 },
+	{ PCI_DID_INTEL_PTL_H_ID_7, PTL_CORE_4, TDP_25W, PTL_SKU_7, PTL_TDC_4 },
+	{ PCI_DID_INTEL_PTL_H_ID_8, PTL_CORE_3, TDP_25W, PTL_SKU_2, PTL_TDC_3 },
+	{ PCI_DID_INTEL_WCL_ID_1, WCL_CORE, TDP_15W, WCL_SKU_1, WCL_TDC_1 },
+	{ PCI_DID_INTEL_WCL_ID_2, WCL_CORE, TDP_15W, WCL_SKU_2, WCL_TDC_1 },
+	{ PCI_DID_INTEL_WCL_ID_3, WCL_CORE, TDP_15W, WCL_SKU_3, WCL_TDC_1 },
+	{ PCI_DID_INTEL_WCL_ID_4, WCL_CORE, TDP_15W, WCL_SKU_4, WCL_TDC_1 },
+	{ PCI_DID_INTEL_WCL_ID_5, WCL_CORE, TDP_15W, WCL_SKU_5, WCL_TDC_1 },
 };
 
 /* Types of display ports */
@@ -176,6 +204,7 @@ enum vr_domain {
 	VR_DOMAIN_IA,
 	VR_DOMAIN_GT,
 	VR_DOMAIN_SA,
+	VR_DOMAIN_ATOM,
 	NUM_VR_DOMAINS,
 };
 
@@ -193,6 +222,11 @@ enum slew_rate {
 	SLEW_FAST_8,
 	SLEW_FAST_16,
 	SLEW_IGNORE = 0xff,
+};
+
+enum tdc_mode {
+	TDC_IPL2,
+	TDC_IRMS,
 };
 
 struct soc_intel_pantherlake_config {
@@ -403,6 +437,64 @@ struct soc_intel_pantherlake_config {
 	uint16_t thermal_design_current[MAX_PTL_SKUS][NUM_VR_DOMAINS];
 
 	/*
+	 * Thermal Design Current (TDC) mode for each Voltage Regulator (VR) domain.
+	 *
+	 * The mode indicates the method used for managing thermal constraints and power
+	 * consumption based on current measurement techniques.
+	 *
+	 * Possible values:
+	 * - 0: iPL2
+	 * - 1: Irms
+	 */
+	uint8_t tdc_mode[NUM_VR_DOMAINS];
+
+	/*
+	 * Time Window for Thermal Design Current (TDC) for each Voltage Regulator (VR)
+	 * domain.
+	 *
+	 * This array specifies the time window for TDC measurement for each VR
+	 * domain. The TDC time window determines the duration over which the current is
+	 * averaged.
+	 *
+	 * Units are milliseconds.
+	 */
+	uint32_t tdc_time_window_ms[NUM_VR_DOMAINS];
+
+	/*
+	 * Maximum Integrated Current Capability (ICC) settings for various SKUs.
+	 *
+	 * ICC values represent the maximum allowable current for a given SKU
+	 * and VR domain configuration.
+	 *
+	 * ICC unit is defined in 1/4A increments. For example, a value of 400
+	 * corresponds to 100A.
+	 */
+	uint16_t icc_max[MAX_PTL_SKUS][NUM_VR_DOMAINS];
+
+	/*
+	 * Power State Current Thresholds for VR Domains.
+	 *
+	 * These arrays define the current thresholds for different power states (PS1,
+	 * PS2, PS3) for each Voltage Regulator (VR) domain.
+	 *
+	 * Each value is defined in 1/4 A increments.  For example, a value of 400
+	 * corresponds to 100A. The valid range is 0-512 (0-128A).  A value of 0
+	 * indicates AUTO (use default).
+	 */
+	uint16_t ps1_threshold[NUM_VR_DOMAINS];
+	uint16_t ps2_threshold[NUM_VR_DOMAINS];
+	uint16_t ps3_threshold[NUM_VR_DOMAINS];
+
+	/*
+	 * Thermal Design Power setting.
+	 *
+	 * Certain Panther Lake SKUs are compatible with multiple TDP options. For these
+	 * SKUs, the following field can be set to choose the TDP that best fits the
+	 * board's power and thermal requirements.
+	 */
+	enum soc_intel_pantherlake_cpu_tdps tdp;
+
+	/*
 	 * SerialIO device mode selection:
 	 * PchSerialIoDisabled,
 	 * PchSerialIoPci,
@@ -413,12 +505,21 @@ struct soc_intel_pantherlake_config {
 	uint8_t serial_io_i2c_mode[CONFIG_SOC_INTEL_I2C_DEV_MAX];
 	uint8_t serial_io_gspi_mode[CONFIG_SOC_INTEL_COMMON_BLOCK_GSPI_MAX];
 	uint8_t serial_io_uart_mode[CONFIG_SOC_INTEL_UART_DEV_MAX];
+
+	/*
+	 * SerialIO DMA/PIO mode:
+	 * 0: Disable (PIO)
+	 * 1: Enable (DMA)
+	 */
+	uint8_t serial_io_uart_dma_enable[CONFIG_SOC_INTEL_UART_DEV_MAX];
+
 	/*
 	 * GSPIn Default Chip Select Mode:
 	 * 0:Hardware Mode,
 	 * 1:Software Mode
 	 */
 	uint8_t serial_io_gspi_cs_mode[CONFIG_SOC_INTEL_COMMON_BLOCK_GSPI_MAX];
+
 	/*
 	 * GSPIn Default Chip Select State:
 	 * 0: Low,
@@ -637,6 +738,10 @@ struct soc_intel_pantherlake_config {
 	 * as per `enum slew_rate` data type.
 	 */
 	uint8_t slow_slew_rate_config[NUM_VR_DOMAINS];
+	/* P-cores Hysteresis time window ranges from 1 to 50 ms. */
+	uint8_t pcore_hysteresis_window_ms;
+	/* E-cores Hysteresis time window ranges from 1 to 50 ms. */
+	uint8_t ecore_hysteresis_window_ms;
 
 	uint16_t max_dram_speed_mts;
 

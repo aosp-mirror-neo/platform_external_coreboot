@@ -18,10 +18,11 @@ config BOARD_AMD_CRATER_COMMON
 	select SPI_FLASH_EXIT_4_BYTE_ADDR_MODE
 	select SOC_AMD_COMMON_BLOCK_PSP_RPMC
 	select SOC_AMD_COMMON_BLOCK_PSP_SMI
+	select KEEP_ACP_RUNNING_IN_S3
 
 config BOARD_AMD_CRATER_RENOIR
 	select BOARD_AMD_CRATER_COMMON
-	select SOC_AMD_CEZANNE
+	select SOC_AMD_RENOIR
 
 if BOARD_AMD_CRATER_RENOIR
 
@@ -51,6 +52,9 @@ config CRATER_MCHP_FW_FILE
 	default "3rdparty/blobs/mainboard/amd/crater/EcSig_Crater.bin"
 	help
 	  The EC firmware blob is at the EC_BODY FMAP region of the firmware image.
+
+config PSP_RECOVERY_AB
+	default y
 
 config VBOOT
 	select VBOOT_NO_BOARD_SUPPORT
@@ -91,6 +95,18 @@ config ENABLE_EVAL_19V
 	help
 	  Enable the 19V rail for Eval Card PCIe slot
 
+config ENABLE_M2_SSD
+	bool "Enable M.2 SSD Slot"
+	default y
+	help
+	  Use GPP[8:11] connected to M.2 SSD
+
+config NVME_RST_GPIO40
+	bool "NVMe Reset on GPIO40"
+	help
+	  Select if the NVMe reset pin is connected to GPIO40.
+	  Otherwise its assumed to be connected to GPIO24.
+
 choice
 	prompt "XGBE/WWAN/WLAN/DT Selection"
 	default XGBE_WWAN_WLAN
@@ -100,13 +116,68 @@ choice
 config XGBE_WWAN_WLAN
 	bool "XGBE_WWAN_WLAN"
 	help
-	  Use GPP[0:1] for XGBE (ETH_AIC_SLOT), GPP[2] for WWAN slot and GPP[3] for WLAN slot.
+	  Use GPP[0:1] connected to ETH AIC  (PCIe x4 Slot)
+	  Use GPP[2]   connected to WWAN/GPS (M.2 B-Key)
+	  Use GPP[3]   connected to WiFi/BT  (M.2 E-Key)
 
-config ETH_AIC_SLOT_ONLY
-	bool "DT Enablement"
+config PCIE_DT_SLOT
+	bool "PCIe Slot"
 	help
-	  Use GPP[0:3] for as PCIE (ETH_AIC_SLOT) only
+	  Use GPP[0:3] connected to PCIe x4 Slot
+
 endchoice
+
+choice
+	prompt "SGMII lanes interface"
+	depends on XGBE_WWAN_WLAN
+	default GBE_PATH_SELECT_AIC2
+	help
+	  Option to select either AIC2 card (Marvell Phy), AIC3 card (Broadcom Phy) or
+	  Backplane mode for SGMII
+
+config GBE_PATH_SELECT_AIC2
+	bool "AIC2 PHY"
+	help
+	  Select to use AIC2 Marvell Phy card
+
+config GBE_PATH_SELECT_AIC3
+	bool "AIC3 PHY"
+	help
+	  Select to use AIC3 Boradcom Phy card
+
+config XGBE_PATH_SELECT_BACKPLANE
+	bool "BackPlane"
+	help
+	  Select to use BackPlane Mode
+
+endchoice # "SGMII lanes interface"
+
+choice
+	prompt "XGBE port speed"
+	depends on XGBE_WWAN_WLAN && !XGBE_PATH_SELECT_BACKPLANE
+	default XGBE_10_100_1000MB_SPEED
+
+config XGBE_10_100_1000MB_SPEED
+	bool "10/100/1000MB"
+	help
+	  Set XGBE port speed to support 10/100/1000MB.
+
+config XGBE_10MB_SPEED
+	bool "10MB Port Speed"
+	help
+	  Set XGBE port speed to support 10MBps.
+
+config XGBE_100MB_SPEED
+	bool "100 MBps port speed"
+	help
+	  Set XGBE port speed to support 1000MBps.
+
+config XGBE_1G_SPEED
+	bool "1G Port Speed"
+	help
+	  Set XGBE port speed to support 1GBps.
+
+endchoice # "XGBE port speed"
 
 if !EM100	# EM100 defaults in soc/amd/common/blocks/spi/Kconfig
 config EFS_SPI_READ_MODE

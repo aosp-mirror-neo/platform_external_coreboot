@@ -37,8 +37,8 @@ static const struct pad_config t3_gpio_table[] = {
 	PAD_CFG_GPO(GPP_A11, 1, PLTRST),
 	/* GPP_A12:     WIFI_WAKE_N */
 	PAD_CFG_GPI_SCI_LOW(GPP_A12, NONE, DEEP, LEVEL),
-	/* GPP_A15:     GPP_A15_DNX_FORCE_RELOAD */
-	PAD_CFG_NF(GPP_A15, NONE, DEEP, NF1),
+	/* GPP_A15:     NC */
+	PAD_NC(GPP_A15, NONE),
 	/* GPP_A16:     BT_RF_KILL_N */
 	PAD_CFG_GPO(GPP_A16, 1, DEEP),
 	/* GPP_A17:     WIFI_RF_KILL_N */
@@ -455,6 +455,7 @@ const struct pad_config *variant_board_gpio_diff_table(size_t *num)
 
 	switch (board_id) {
 	case PTLP_LP5_T3_RVP:
+	case PTLP_LPCAMM_T3_RVP:
 		return NULL;
 	case PTLP_LP5_T4_RVP:
 		*num = ARRAY_SIZE(t4_gpio_diff_table);

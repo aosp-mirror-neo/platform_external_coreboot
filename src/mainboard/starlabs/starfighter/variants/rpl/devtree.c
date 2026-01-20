@@ -8,6 +8,7 @@
 #include <static.h>
 #include <types.h>
 #include <variants.h>
+#include <common/powercap.h>
 
 #define TJ_MAX		110
 #define TCC(temp)	(TJ_MAX - temp)
@@ -23,7 +24,7 @@ void devtree_update(void)
 		&cfg->power_limits_config[RPL_P_682_642_482_45W_CORE];
 
 	struct device *tbt_pci_dev_0 = pcidev_on_root(0x07, 0);
-	struct device *tbt_pci_dev_1 = pcidev_on_root(0x07, 0);
+	struct device *tbt_pci_dev_1 = pcidev_on_root(0x07, 1);
 	struct device *tbt_dma_dev = pcidev_on_root(0x0d, 2);
 	struct device *gna_dev = pcidev_on_root(0x08, 0);
 
@@ -60,7 +61,7 @@ void devtree_update(void)
 	soc_conf_14core->tdp_pl2_override = (soc_conf_14core->tdp_pl2_override * performance_scale) / 100;
 
 	/* Enable/Disable Bluetooth based on CMOS settings */
-	if (get_uint_option("wireless", 1) == 0)
+	if (get_uint_option("bluetooth", 1) == 0)
 		cfg->usb2_ports[9].enable = 0;
 
 	/* Enable/Disable Webcam based on CMOS settings */

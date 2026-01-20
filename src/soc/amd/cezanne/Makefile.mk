@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
-ifeq ($(CONFIG_SOC_AMD_CEZANNE),y)
+ifeq ($(CONFIG_SOC_AMD_CEZANNE_BASE),y)
 
 subdirs-$(CONFIG_VBOOT_STARTS_BEFORE_BOOTBLOCK) += psp_verstage
 
@@ -17,6 +17,8 @@ bootblock-y	+= early_fch.c
 bootblock-y	+= espi_util.c
 
 romstage-y	+= fsp_m_params.c
+romstage-$(CONFIG_SOC_AMD_CEZANNE) += fsp_m_params_cezanne.c
+romstage-$(CONFIG_SOC_AMD_RENOIR)  += fsp_m_params_renoir.c
 
 ramstage-y	+= acpi.c
 ramstage-y	+= chip.c
@@ -36,8 +38,15 @@ smm-$(CONFIG_DEBUG_SMI) += uart.c
 
 CPPFLAGS_common += -I$(src)/soc/amd/cezanne/include
 CPPFLAGS_common += -I$(src)/soc/amd/cezanne/acpi
-CPPFLAGS_common += -I$(src)/vendorcode/amd/fsp/cezanne
 CPPFLAGS_common += -I$(src)/vendorcode/amd/fsp/common
+
+ifeq ($(CONFIG_SOC_AMD_CEZANNE),y)
+CPPFLAGS_common += -I$(src)/vendorcode/amd/fsp/cezanne
+endif
+
+ifeq ($(CONFIG_SOC_AMD_RENOIR),y)
+CPPFLAGS_common += -I$(src)/vendorcode/amd/fsp/renoir
+endif
 
 # 0x40 accounts for the cbfs_file struct + filename + metadata structs, aligned to 64 bytes
 # Building the cbfs image will fail if the offset isn't large enough
@@ -285,4 +294,4 @@ apu/amdfw_b-position := $(AMD_FW_AB_POSITION)
 apu/amdfw_b-type := raw
 endif
 
-endif # ($(CONFIG_SOC_AMD_CEZANNE),y)
+endif # ($(CONFIG_SOC_AMD_CEZANNE_BASE),y)

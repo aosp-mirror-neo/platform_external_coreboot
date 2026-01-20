@@ -1,61 +1,62 @@
 fw_config
 	field AUDIO 0 1
-		option AUDIO_NONE		0
-		option AUDIO_ALC721_SNDW	1
-		option AUDIO_ALC256_HDA		2
+		option AUDIO_NONE			0
+		option AUDIO_ALC721_SNDW		1
+		option AUDIO_ALC256_HDA			2
+		option AUDIO_MAX98360_ALC5682I_I2S	3
 	end
 	field WIFI 2 4
-		option WIFI_NONE		0
-		option WIFI_CNVI_6		1
-		option WIFI_PCIE_6		2
-		option WIFI_CNVI_7		3
-		option WIFI_PCIE_7		4
+		option WIFI_NONE			0
+		option WIFI_CNVI_6			1
+		option WIFI_PCIE_6			2
+		option WIFI_CNVI_7			3
+		option WIFI_PCIE_7			4
 	end
 	field CELLULAR 5 6
-		option CELLULAR_ABSENT		0
-		option CELLULAR_USB		1
-		option CELLULAR_PCIE		2
+		option CELLULAR_ABSENT			0
+		option CELLULAR_USB			1
+		option CELLULAR_PCIE			2
 	end
 	field TOUCHSCREEN 7 8
-		option TOUCHSCREEN_NONE		0
-		option TOUCHSCREEN_THC_SPI	1
-		option TOUCHSCREEN_THC_I2C	2
+		option TOUCHSCREEN_NONE			0
+		option TOUCHSCREEN_THC_SPI		1
+		option TOUCHSCREEN_THC_I2C		2
 	end
 	field TOUCHPAD 9 10
-		option TOUCHPAD_NONE		0
-		option TOUCHPAD_THC_I2C		1
-		option TOUCHPAD_LPSS_I2C	2
+		option TOUCHPAD_NONE			0
+		option TOUCHPAD_THC_I2C			1
+		option TOUCHPAD_LPSS_I2C		2
 	end
 	field SD 11 12
-		option SD_NONE			0
-		option SD_GENSYS		1
-		option SD_BAYHUB		2
+		option SD_NONE				0
+		option SD_GENSYS			1
+		option SD_BAYHUB			2
 	end
 	field STORAGE 13 14
-		option STORAGE_UNKNOWN		0
-		option STORAGE_NVME_GEN4	1
-		option STORAGE_UFS		2
+		option STORAGE_UNKNOWN			0
+		option STORAGE_NVME_GEN4		1
+		option STORAGE_UFS			2
 	end
 	field FP 15
-		option FP_ABSENT		0
-		option FP_PRESENT		1
+		option FP_ABSENT			0
+		option FP_PRESENT			1
 	end
 	field DISPLAY 16 17
-		option DISPLAY_ABSENT		0
-		option DISPLAY_TOUCH_PRESENT	1
-		option DISPLAY_NO_TOUCH_PRESENT	2
+		option DISPLAY_ABSENT			0
+		option DISPLAY_TOUCH_PRESENT		1
+		option DISPLAY_NO_TOUCH_PRESENT		2
 	end
 	field ISH 18
-		option ISH_DISABLE		0
-		option ISH_ENABLE		1
+		option ISH_DISABLE			0
+		option ISH_ENABLE			1
 	end
 	field KB 19
-		option KB_ABSENT		0
-		option KB_PRESENT		1
+		option KB_ABSENT			0
+		option KB_PRESENT			1
 	end
 	field PSU 20
-		option PSU_USBC			0
-		option PSU_BJ			1
+		option PSU_USBC				0
+		option PSU_BJ				1
 	end
 end
 
@@ -68,33 +69,31 @@ chip soc/intel/pantherlake
 	register "usb2_ports[4]" = "USB2_PORT_MID(OC0)" # 2x5 USB2 HDR
 	register "usb2_ports[5]" = "USB2_PORT_MID(OC0)" # 2x5 USB2 HDR
 	register "usb2_ports[6]" = "USB2_PORT_MID(OC0)" # FPS
-	register "usb2_ports[7]" = "USB2_PORT_MID(OC0)" # M.2 WLAN
+	register "usb2_ports[7]" = "USB2_PORT_MID(OC_SKIP)" # Discrete Bluetooth
 
 	register "usb3_ports[0]" = "USB3_PORT_DEFAULT(OC0)" # USB 3.2 Gen2 x1 Type-A Con - # 1
 	register "usb3_ports[1]" = "USB3_PORT_DEFAULT(OC0)" # USB 3.2 Gen2 x1 Type-A Con - # 2 (redriver topology)
-	#register "usb3_ports[2]" = "USB3_PORT_DEFAULT(OC0)" # TCSS Module - Type-A over TCP module
 
-	register "tcss_ports[0]" = "TCSS_PORT_DEFAULT(OC0)"
-	register "tcss_ports[1]" = "TCSS_PORT_DEFAULT(OC_SKIP)"
+	register "tcss_ports[0]" = "TCSS_PORT_DEFAULT(OC_SKIP)" # Type-C Port 1 (Virtual OC)
+	register "tcss_ports[1]" = "TCSS_PORT_DEFAULT(OC_SKIP)" # Type-C Port 2 (Virtual OC)
 
 	register "tcss_cap_policy[0]" = "TCSS_TYPE_C_PORT_FULL_FUN"
 	register "tcss_cap_policy[1]" = "TCSS_TYPE_C_PORT_FULL_FUN"
-
 
 	# Enable EDP in PortA & HDMI in Port B
 	register "ddi_port_A_config" = "1"
 	register "ddi_port_B_config" = "1"
 	register "ddi_ports_config" = "{
 		[DDI_PORT_A] = DDI_ENABLE_HPD,
-		[DDI_PORT_B] = DDI_ENABLE_HPD,
+		[DDI_PORT_B] = DDI_ENABLE_HPD | DDI_ENABLE_DDC,
 	}"
 
 	register "serial_io_i2c_mode" = "{
 		[PchSerialIoIndexI2C0]  = PchSerialIoPci,
 		[PchSerialIoIndexI2C1]  = PchSerialIoPci,
-		[PchSerialIoIndexI2C2]  = PchSerialIoPci,
-		[PchSerialIoIndexI2C3]  = PchSerialIoPci,
-		[PchSerialIoIndexI2C4]  = PchSerialIoPci,
+		[PchSerialIoIndexI2C2]  = PchSerialIoDisabled,
+		[PchSerialIoIndexI2C3]  = PchSerialIoDisabled,
+		[PchSerialIoIndexI2C4]  = PchSerialIoDisabled,
 		[PchSerialIoIndexI2C5]  = PchSerialIoPci,
 	}"
 
@@ -112,20 +111,12 @@ chip soc/intel/pantherlake
 	#| I2C5              | Touchpad                  |
 	#+-------------------+---------------------------+
 	register "common_soc_config" = "{
-		.logo_valignment = FW_SPLASH_VALIGNMENT_MIDDLE,
+		/* Render OEM footer logo 100px above from the edge */
+		.logo_bottom_margin = 100,
 		.chipset_lockdown = CHIPSET_LOCKDOWN_COREBOOT,
 		.i2c[1] = {
 			.speed = I2C_SPEED_FAST,
 			.early_init = 1,
-		},
-		.i2c[2] = {
-			.speed = I2C_SPEED_FAST,
-		},
-		.i2c[3] = {
-			.speed = I2C_SPEED_FAST,
-		},
-		.i2c[4] = {
-			.speed = I2C_SPEED_FAST,
 		},
 		.i2c[5] = {
 			.speed = I2C_SPEED_FAST,
@@ -137,7 +128,7 @@ chip soc/intel/pantherlake
 			probe DISPLAY DISPLAY_TOUCH_PRESENT
 			probe DISPLAY DISPLAY_NO_TOUCH_PRESENT
 			chip drivers/gfx/generic
-				register "device_count" = "5"
+				register "device_count" = "4"
 				# DDIA for eDP
 				register "device[0].name" = ""LCD0""
 				register "device[0].type" = "panel"
@@ -152,10 +143,7 @@ chip soc/intel/pantherlake
 				register "device[3].name" = ""DD03""
 				register "device[3].use_pld" = "true"
 				register "device[3].pld" = "ACPI_PLD_TYPE_C(LEFT, RIGHT, ACPI_PLD_GROUP(2, 1))"
-				# TCP2 (DP-3) for port C2
-				register "device[4].name" = ""DD04""
-				register "device[4].use_pld" = "true"
-				register "device[4].pld" = "ACPI_PLD_TYPE_C(RIGHT, LEFT, ACPI_PLD_GROUP(3, 1))"
+
 				device generic 0 on end
 			end
 		end
@@ -359,13 +347,13 @@ chip soc/intel/pantherlake
 					chip drivers/usb/acpi
 						register "desc" = ""USB3 Type-C Port C0""
 						register "type" = "UPC_TYPE_C_USB2_SS_SWITCH"
-						register "group" = "ACPI_PLD_GROUP(4, 2)"
+						register "group" = "ACPI_PLD_GROUP(2, 2)"
 						device ref tcss_usb3_port0 on end
 					end
 					chip drivers/usb/acpi
 						register "desc" = ""USB3 Type-C Port C1""
 						register "type" = "UPC_TYPE_C_USB2_SS_SWITCH"
-						register "group" = "ACPI_PLD_GROUP(3, 2)"
+						register "group" = "ACPI_PLD_GROUP(1, 2)"
 						device ref tcss_usb3_port1 on end
 					end
 				end
@@ -387,7 +375,6 @@ chip soc/intel/pantherlake
 
 		device ref ish on
 			probe ISH ISH_ENABLE
-			probe FP FP_PRESENT
 			chip drivers/intel/ish
 				register "add_acpi_dma_property" = "true"
 				device generic 0 on end
@@ -487,9 +474,19 @@ chip soc/intel/pantherlake
 		end # Gen4 M.2 SSD
 
 		device ref pcie_rp5 on
+			probe WIFI WIFI_PCIE_6
+			probe WIFI WIFI_PCIE_7
+			register "pcie_rp[PCIE_RP(5)]" = "{
+			.clk_src = 0,
+			.clk_req = 0,
+			.flags = PCIE_RP_CLK_REQ_DETECT | PCIE_RP_LTR | PCIE_RP_AER,
+			}"
+		end # M.2 WLAN KEY-E
+
+		device ref pcie_rp6 on
 			probe SD SD_GENSYS
 			probe SD SD_BAYHUB
-			register "pcie_rp[PCIE_RP(5)]" = "{
+			register "pcie_rp[PCIE_RP(6)]" = "{
 			.clk_src = 2,
 			.clk_req = 2,
 			.flags = PCIE_RP_CLK_REQ_DETECT | PCIE_RP_LTR | PCIE_RP_AER,
@@ -519,6 +516,10 @@ chip soc/intel/pantherlake
 		device ref cnvi_bluetooth on
 			probe WIFI WIFI_CNVI_6
 			probe WIFI WIFI_CNVI_7
+			chip soc/intel/common/block/cnvi
+				register "wake" = "GPE0_PME_B0"
+				device generic 0 on end
+			end
 		end
 
 		# NOTE: i2c0 is function 0; hence it needs to be enabled when any of i2c1-5 is enabled.
@@ -554,7 +555,7 @@ chip soc/intel/pantherlake
 				register "uid" = "1"
 				register "compat_string" = ""google,cros-ec-spi""
 				register "irq" = "ACPI_IRQ_WAKE_LEVEL_LOW(GPP_E19_IRQ)"
-				register "wake" = "GPE0_DW1_19"
+				register "wake" = "GPE0_DW2_19"
 				register "has_power_resource" = "true"
 				register "reset_gpio" = "ACPI_GPIO_OUTPUT_ACTIVE_LOW(GPP_C15)"
 				register "enable_gpio" = "ACPI_GPIO_OUTPUT_ACTIVE_HIGH(GPP_E05)"
@@ -567,6 +568,9 @@ chip soc/intel/pantherlake
 
 		device ref smbus on end
 		device ref hda on
+			probe AUDIO AUDIO_ALC721_SNDW
+			probe AUDIO AUDIO_ALC256_HDA
+			probe AUDIO AUDIO_MAX98360_ALC5682I_I2S
 			chip drivers/intel/soundwire
 				device generic 0 on
 					chip drivers/soundwire/alc711
@@ -574,6 +578,7 @@ chip soc/intel/pantherlake
 						register "alc711_address.version" = "SOUNDWIRE_VERSION_1_2"
 						register "alc711_address.class" = "MIPI_CLASS_SDCA"
 						register "alc711_address.part_id" = "MIPI_DEV_ID_REALTEK_ALC721"
+						register "disable_clkstop_sm_support" = "true"
 						# SoundWire Link 3 ID 1
 						device generic 3.1 on
 							probe AUDIO AUDIO_ALC721_SNDW

@@ -12,6 +12,7 @@
 #include <soc/dptx_reg.h>
 #include <soc/dp_intf.h>
 #include <string.h>
+#include <timer.h>
 
 static void dptx_training_checkswingpre(struct mtk_dp *mtk_dp,
 					u8 target_lane_count,
@@ -357,14 +358,16 @@ static void dptx_training_changemode(struct mtk_dp *mtk_dp)
 	mdelay(2);
 }
 
-static int dptx_set_trainingstart(struct mtk_dp *mtk_dp)
+int dptx_set_trainingstart(struct mtk_dp *mtk_dp)
 {
 	u8 lanecount;
 	u8 linkrate;
 	u8 buffer;
 	u8 limit;
 	u8 max_linkrate;
+	struct stopwatch sw;
 
+	stopwatch_init(&sw);
 	buffer = 0x1;
 	dptx_auxwrite_dpcd(mtk_dp, DP_AUX_NATIVE_WRITE,
 			   DPCD_00600, 0x1, &buffer);
@@ -447,53 +450,11 @@ static int dptx_set_trainingstart(struct mtk_dp *mtk_dp)
 			else
 				return DPTX_TRANING_FAIL;
 		} else {
+			printk(BIOS_INFO, "%s done after %lld msecs\n", __func__,
+			       stopwatch_duration_msecs(&sw));
 			return DPTX_PASS;
 		}
 	} while (--limit > 0);
 
 	return DPTX_TRANING_FAIL;
-}
-
-static void dptx_init_port(struct mtk_dp *mtk_dp)
-{
-	dptx_hal_phy_setidlepattern(mtk_dp, true);
-	dptx_hal_init_setting(mtk_dp);
-	dptx_hal_aux_setting(mtk_dp);
-	dptx_hal_digital_setting(mtk_dp);
-	dptx_hal_phy_setting(mtk_dp);
-	dptx_hal_hpd_detect_setting(mtk_dp);
-
-	dptx_hal_digital_swreset(mtk_dp);
-	dptx_hal_analog_power_en(mtk_dp, true);
-	dptx_hal_hpd_int_en(mtk_dp, true);
-}
-
-int mtk_edp_init(struct mtk_dp *mtk_dp, struct edid *edid)
-{
-	dptx_init_variable(mtk_dp);
-	dptx_init_port(mtk_dp);
-
-	if (!dptx_hal_hpd_high(mtk_dp)) {
-		printk(BIOS_ERR, "HPD is low\n");
-		return -1;
-	}
-
-	dptx_check_sinkcap(mtk_dp);
-
-	if (dptx_get_edid(mtk_dp, edid) != 0) {
-		printk(BIOS_ERR, "Failed to get EDID\n");
-		return -1;
-	}
-
-	dptx_set_trainingstart(mtk_dp);
-	dp_intf_config(edid);
-	dptx_video_config(mtk_dp);
-
-	return 0;
-}
-
-int mtk_edp_enable(struct mtk_dp *mtk_dp)
-{
-	dptx_video_enable(mtk_dp, true);
-	return 0;
 }

@@ -25,7 +25,7 @@ const struct pad_config gpio_table[] = {
 	PAD_CFG_NF(GPD5, NONE, DEEP, NF1),				/* Sleep S4 */
 	PAD_CFG_NF(GPD8, NONE, DEEP, NF1),				/* Bluetooth Suspend */
 
-	/* eSPI */
+	/* eSPI - Configure automatically on reset */
 	// PAD_CFG_NF_IOSTANDBY_IGNORE(GPP_A0, UP_20K, DEEP, NF1),	/* eSPI IO 0 */
 	// PAD_CFG_NF_IOSTANDBY_IGNORE(GPP_A1, UP_20K, DEEP, NF1),	/* eSPI IO 1 */
 	// PAD_CFG_NF_IOSTANDBY_IGNORE(GPP_A2, UP_20K, DEEP, NF1),	/* eSPI IO 2 */
@@ -38,6 +38,8 @@ const struct pad_config gpio_table[] = {
 	PAD_CFG_NF(GPP_D5, NONE, DEEP, NF1),				/* Clock Request 0 */
 	PAD_CFG_GPO(GPP_H0, 1, PLTRST),					/* Reset */
 	PAD_CFG_GPO(GPP_D16, 1, DEEP),					/* Enable */
+	PAD_CFG_NF(GPP_H13, NONE, DEEP, NF5),				/* Device Sleep */
+	PAD_CFG_NF(GPP_A12, NONE, DEEP, NF1),				/* PEDET */
 
 	/* Wireless */
 	PAD_CFG_NF(GPP_F0, NONE, DEEP, NF1),				/* BRI Data */
@@ -107,7 +109,6 @@ const struct pad_config gpio_table[] = {
 	PAD_NC(GPP_A7, NONE),
 	PAD_NC(GPP_A8, NONE),
 	PAD_NC(GPP_A11, NONE),
-	PAD_NC(GPP_A12, NONE),
 	PAD_NC(GPP_A14, NONE),
 	PAD_NC(GPP_A15, NONE),
 	PAD_NC(GPP_A16, NONE),
@@ -220,7 +221,6 @@ const struct pad_config gpio_table[] = {
 	PAD_NC(GPP_H8, NONE),
 	PAD_NC(GPP_H9, NONE),
 	PAD_NC(GPP_H12, NONE),
-	PAD_NC(GPP_H13, NONE),
 	PAD_NC(GPP_H14, NONE),
 	PAD_NC(GPP_H16, NONE),
 	PAD_NC(GPP_H19, NONE),

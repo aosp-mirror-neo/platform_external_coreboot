@@ -1,5 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 
+#include <soc/iomap.h>
+
 #if MAINBOARD_HAS_SPEAKER
 #define IO61_HID "PNP0800" /* AT style speaker */
 #else
@@ -14,10 +16,12 @@ Device(LPCB) {
 	*	DBGO("\\_SB\\PCI0\\LpcIsaBr\\_INI\n")
 	} */ /* End Method(_SB.SBRDG._INI) */
 
-	OperationRegion(CFG,PCI_Config,0x0,0x100) // Map PCI Configuration Space
-	Field(CFG,DWordAcc,NoLock,Preserve){
-		Offset(0xA0),
-		BAR,32}		// SPI Controller Base Address Register (Index 0xA0)
+	OperationRegion (ERMM, SystemMemory, 0xFED80300, 0x1)
+	Field (ERMM, AnyAcc, NoLock, Preserve)
+	{
+		, 6,
+		HPEN, 1
+	}
 
 	Device(LDRC)	// LPC device: Resource consumption
 	{
@@ -36,16 +40,25 @@ Device(LPCB) {
 			0x00001000,			// Address Length
 			BAR1				// Descriptor Name
 			)
+#if CONFIG(SOC_AMD_COMMON_BLOCK_HAS_ESPI1)
+			Memory32Fixed(ReadWrite,	// Setup for fixed resource location for eSPI1 base address
+			0x00000000,			// Address Base
+			0x00001000,			// Address Length
+			BAR2
+			)
+#endif
 		})
 
 		Method(_CRS,0,Serialized)
 		{
 			CreateDwordField(^CRS,^BAR0._BAS,SPIB)	// Field to hold SPI base address
 			CreateDwordField(^CRS,^BAR1._BAS,ESPB)	// Field to hold eSPI base address
-			Local0 = BAR & 0xffffff00
-			SPIB = Local0	// SPI base address mapped
-			Local1 = Local0 + 0x10000
-			ESPB = Local1	// eSPI base address mapped
+			SPIB = SPI_BASE_ADDRESS	// SPI base address mapped
+			ESPB = SPIB + 0x10000	// eSPI base address mapped
+#if CONFIG(SOC_AMD_COMMON_BLOCK_HAS_ESPI1)
+			CreateDwordField(^CRS,^BAR2._BAS,ESP1)	// Field to hold eSPI base address
+			ESP1 = ESPB + 0x10000	// eSPI base address mapped
+#endif
 			Return(CRS)
 		}
 	}
@@ -53,10 +66,23 @@ Device(LPCB) {
 	/* Real Time Clock Device */
 	Device(RTC0) {
 		Name(_HID, EISAID("PNP0B00"))   /* AT Real Time Clock (not PIIX4 compatible) */
-		Name(_CRS, ResourceTemplate() {
+		Name(CRS0, ResourceTemplate() {
+			IO(Decode16,0x0070, 0x0070, 0, 2)
+		})
+		Name(CRS1, ResourceTemplate() {
 			IRQNoFlags(){8}
 			IO(Decode16,0x0070, 0x0070, 0, 2)
 		})
+		Method (_CRS, 0)
+		{
+			/* Avoid IRQ resource conflict with HPET */
+			If (^^HPEN)
+			{
+				Return (CRS0)
+			}
+
+			Return (CRS1)
+		}
 	} /* End Device(_SB.PCI0.LpcIsaBr.RTC0) */
 
 	Device(TMR) {	/* Timer */
@@ -104,4 +130,27 @@ Device(LPCB) {
 			IRQNoFlags(){13}
 		})
 	} /* End Device(_SB.PCI0.LpcIsaBr.COPR) */
+
+	Device (HPET) {
+		Name (_HID,EISAID("PNP0103"))	/* HPET System Timer */
+		Name (_CRS, ResourceTemplate () {
+			Memory32Fixed(ReadWrite,
+			0xFED00000,
+			0x00000400,
+			)
+			IRQNoFlags(){0}
+			IRQNoFlags(){8}
+		})
+
+		Method (_STA, 0, NotSerialized)
+		{
+			If (^^HPEN)
+			{
+				Return (0xF)
+			}
+
+			Return (0x1)
+		}
+	}
+
 } /* end LPCB */

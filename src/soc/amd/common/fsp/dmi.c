@@ -84,7 +84,10 @@ static void transfer_memory_info(const TYPE17_DMI_INFO *dmi17,
 
 	dimm->bank_locator = 0;
 
-	dimm->vdd_voltage = ddr_get_voltage(dmi17->MemoryType);
+	dimm->vdd_max_voltage = dmi17->MaximumVoltage;
+	dimm->vdd_min_voltage = dmi17->MinimumVoltage;
+	dimm->vdd_voltage = dmi17->ConfiguredVoltage ? dmi17->ConfiguredVoltage :
+			    ddr_get_voltage(dmi17->MemoryType);
 
 	strncpy((char *)dimm->module_part_number, dmi17->PartNumber,
 		sizeof(dimm->module_part_number) - 1);
@@ -218,9 +221,12 @@ static void prepare_dmi_16_17(void *unused)
 	for (unsigned int channel = 0; channel < AGESA_STRUCT_CHANNELS_PER_SOCKET; channel++) {
 		for (unsigned int dimm = 0; dimm < AGESA_STRUCT_DIMMS_PER_CHANNEL; dimm++) {
 			type17_dmi_info = &dmi_table->T17[0][channel][dimm];
-			/* DIMMs that are present will have a non-zero
-			   handle. */
-			if (type17_dmi_info->Handle == 0)
+			/*
+			 * DIMMs that are present will always have a non-zero handle.
+			 * FSP will set the MemoryType to UNKNOWN if DIMM not present.
+			 */
+			if (type17_dmi_info->Handle == 0 ||
+					type17_dmi_info->MemoryType == MEMORY_TYPE_UNKNOWN)
 				continue;
 			print_dmi_info(type17_dmi_info);
 			dimm_info = &mem_info->dimm[dimm_cnt];

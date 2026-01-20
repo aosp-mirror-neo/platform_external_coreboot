@@ -9,6 +9,7 @@
 #include <edid.h>
 #include <soc/addressmap.h>
 #include <soc/ddp.h>
+#include <soc/display.h>
 
 static void disp_config_main_path_connection(void)
 {
@@ -141,24 +142,15 @@ void mtk_ddp_init(void)
 	write32((void *)(SMI_LARB0 + SMI_LARB_PORT_L0_OVL_RDMA0), 0);
 }
 
-void mtk_ddp_mode_set(const struct edid *edid, enum disp_path_sel path)
+void mtk_ddp_mode_set(const struct edid *edid, enum disp_path_sel path,
+		      struct dsc_config *dsc_config)
 {
-	u32 fmt = OVL_INFMT_RGBA8888;
 	u32 bpp = edid->framebuffer_bits_per_pixel / 8;
 	u32 width = edid->mode.ha;
 	u32 height = edid->mode.va;
-	u32 vrefresh = edid->mode.refresh;
-
-	printk(BIOS_INFO, "%s: display resolution: %ux%u@%u bpp %u\n",
-	       __func__, width, height, vrefresh, bpp);
-
-	if (!vrefresh) {
-		vrefresh = 60;
-		printk(BIOS_INFO, "%s: invalid vrefresh; setting to %u\n",
-		       __func__, vrefresh);
-	}
+	u32 vrefresh = mtk_get_vrefresh(edid);
 
 	main_disp_path_setup(width, height, vrefresh);
 	rdma_start();
-	ovl_layer_config(fmt, bpp, width, height);
+	ovl_layer_config(OVL_INFMT_RGBA8888, bpp, width, height);
 }

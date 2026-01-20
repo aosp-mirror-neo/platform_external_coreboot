@@ -28,7 +28,11 @@ static const struct soc_amd_gpio gpio_set_stage_ram[] = {
 	/* PCIE_RST1_L */
 	PAD_NFO(GPIO_27, PCIE_RST1_L, HIGH),
 	/* M2_SSD0_RST */
+#if CONFIG(NVME_RST_GPIO40)
+	PAD_GPO(GPIO_40, HIGH),
+#else
 	PAD_GPO(GPIO_24, HIGH),
+#endif
 	/* DEVSLP1 */
 	PAD_NFO(GPIO_6, DEVSLP1, LOW),
 
@@ -44,6 +48,12 @@ static const struct soc_amd_gpio gpio_set_stage_ram[] = {
 	PAD_NF(GPIO_9, MDIO1_SCL, PULL_DOWN),
 	/*MDIO1_SDA*/
 	PAD_NF(GPIO_23, MDIO1_SDA, PULL_DOWN),
+
+	/* Enable UART 1 */
+	/* UART1_TXD */
+	PAD_NF(GPIO_140, UART1_TXD, PULL_NONE),
+	/* UART1_RXD */
+	PAD_NF(GPIO_142, UART1_RXD, PULL_NONE),
 
 	/* Enable UART 0 */
 	/* UART0_RXD */

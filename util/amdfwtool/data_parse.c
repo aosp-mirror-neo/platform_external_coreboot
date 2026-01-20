@@ -407,10 +407,6 @@ static uint8_t find_register_fw_filename_psp_dir(char *fw_name, char *filename,
 		fw_type = AMD_FW_GFXIMU_1;
 		instance = 0;
 		subprog = 1;
-	} else if (strcmp(fw_name, "PSP_GFX_IMMU_FILE_2") == 0) {
-		fw_type = AMD_FW_GFXIMU_2;
-		instance = 0;
-		subprog = 0;
 	} else if (strcmp(fw_name, "MINIMSMU_FILE_INS1") == 0) {
 		fw_type = AMD_FW_MINIMSMU;
 		instance = 1;
@@ -626,9 +622,6 @@ static uint8_t find_register_fw_filename_bios_dir(char *fw_name, char *filename,
 		} else {
 			fw_type = AMD_BIOS_SKIP;
 		}
-	} else if (strcmp(fw_name, "PSP_MP2CFG_FILE") == 0) {
-		fw_type = AMD_BIOS_MP2_CFG;
-		subprog = 0;
 	} else {
 		fw_type = AMD_BIOS_INVALID;
 	}
@@ -795,13 +788,18 @@ static uint8_t process_one_line(char *oneline, regmatch_t *match, char *dir,
 	return 1;
 }
 
-bool needs_ish(enum platform platform_type)
+static bool needs_ish(enum platform platform_type)
 {
 	if (platform_type == PLATFORM_MENDOCINO || platform_type == PLATFORM_PHOENIX ||
 		platform_type == PLATFORM_GLINDA || platform_type == PLATFORM_FAEGAN)
 		return true;
 	else
 		return false;
+}
+
+static bool needs_new_combo_layout(enum platform soc_id)
+{
+	return needs_ish(soc_id);
 }
 
 static bool is_second_gen(enum platform platform_type)
@@ -879,6 +877,9 @@ uint8_t process_config(FILE *config, amd_cb_config *cb_config)
 
 	if (cb_config->need_ish)
 		cb_config->recovery_ab = true;
+
+	if (cb_config->use_combo && needs_new_combo_layout(cb_config->soc_id))
+		cb_config->combo_new_rab = true;
 
 	if (cb_config->recovery_ab)
 		cb_config->multi_level = true;

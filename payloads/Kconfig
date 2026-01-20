@@ -4,7 +4,7 @@ menu "Payload"
 
 config PAYLOAD_NONE
 	bool "Don't add a payload"
-	default y if !ARCH_X86
+	default y if !ARCH_X86 && !ARCH_PPC64
 	help
 	  Select this option if you want to create an "empty" coreboot
 	  ROM image for a certain mainboard, i.e. a coreboot ROM image
@@ -17,6 +17,7 @@ if !PAYLOAD_NONE
 choice
 	prompt "Payload to add"
 	default PAYLOAD_SEABIOS if ARCH_X86
+	default PAYLOAD_SKIBOOT if ARCH_PPC64
 
 config PAYLOAD_ELF
 	bool "An ELF executable payload"
@@ -84,6 +85,12 @@ config COMPRESSED_PAYLOAD_LZMA
 	help
 	  In order to reduce the size payloads take up in the ROM chip
 	  coreboot can compress them using the LZMA algorithm.
+
+config COMPRESSED_PAYLOAD_ZSTD
+	bool "Use ZSTD compression for payloads"
+	help
+	  In order to reduce the size payloads take up in the ROM chip
+	  coreboot can compress them using the ZSTD algorithm.
 
 config COMPRESSED_PAYLOAD_LZ4
 	bool "Use LZ4 compression for payloads"

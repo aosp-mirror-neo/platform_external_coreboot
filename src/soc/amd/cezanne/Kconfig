@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-only
 
-config SOC_AMD_CEZANNE
+config SOC_AMD_CEZANNE_BASE
 	bool
 	select ACPI_SOC_NVS
 	select ADD_FSP_BINARIES if USE_AMD_BLOBS
@@ -91,7 +91,28 @@ config SOC_AMD_CEZANNE
 	help
 	  AMD Cezanne support
 
-if SOC_AMD_CEZANNE
+config SOC_AMD_CEZANNE
+	bool
+	select SOC_AMD_CEZANNE_BASE
+	help
+		AMD Cezanne support
+
+config SOC_AMD_RENOIR
+	bool
+	select SOC_AMD_CEZANNE_BASE
+	select SOC_AMD_SUPPORTS_WARM_RESET
+	select SOC_AMD_COMMON_BLOCK_CPU_SYNC_PSP_ADDR_MSR
+	help
+		AMD Renoir support
+
+if SOC_AMD_CEZANNE_BASE
+
+config KEEP_ACP_RUNNING_IN_S3
+	bool
+	default n
+	help
+	  Enables AMD Audio Co-Processor (ACP) to remain operational in ACPI
+	  S3 (sleep) state for continued audio processing support.
 
 config CHIPSET_DEVICETREE
 	string
@@ -100,6 +121,7 @@ config CHIPSET_DEVICETREE
 config FSP_M_FILE
 	string "FSP-M (memory init) binary path and filename"
 	depends on ADD_FSP_BINARIES
+	#default "3rdparty/amd_blobs/renoir/RENOIR_M.fd" if SOC_AMD_RENOIR
 	default "3rdparty/amd_blobs/cezanne/CEZANNE_M.fd"
 	help
 	  The path and filename of the FSP-M binary for this platform.
@@ -107,6 +129,7 @@ config FSP_M_FILE
 config FSP_S_FILE
 	string "FSP-S (silicon init) binary path and filename"
 	depends on ADD_FSP_BINARIES
+	#default "3rdparty/amd_blobs/renoir/RENOIR_S.fd" if SOC_AMD_RENOIR
 	default "3rdparty/amd_blobs/cezanne/CEZANNE_S.fd"
 	help
 	  The path and filename of the FSP-S binary for this platform.
@@ -134,10 +157,12 @@ config PSP_APOB_DRAM_ADDRESS
 
 config PSP_APOB_DRAM_SIZE
 	hex
+	default 0x1E000 if SOC_AMD_RENOIR
 	default 0x10000
 
 config PSP_SHAREDMEM_BASE
 	hex
+	default 0x201F000 if VBOOT && SOC_AMD_RENOIR
 	default 0x2011000 if VBOOT
 	default 0x0
 	help
@@ -249,6 +274,7 @@ config RO_REGION_ONLY
 	default "apu/amdfw"
 
 config ECAM_MMCONF_BASE_ADDRESS
+	default 0xE0000000 if SOC_AMD_RENOIR
 	default 0xF8000000
 
 config ECAM_MMCONF_BUS_NUMBER
@@ -262,6 +288,7 @@ config MAX_CPUS
 
 config VGA_BIOS_ID
 	string
+	default "1002,1636" if SOC_AMD_RENOIR
 	default "1002,1638"
 	help
 	  The default VGA BIOS PCI vendor/device ID should be set to the
@@ -269,6 +296,7 @@ config VGA_BIOS_ID
 
 config VGA_BIOS_FILE
 	string
+	#default "3rdparty/amd_blobs/renoir/RenoirGenericVbios.bin" if SOC_AMD_RENOIR
 	default "3rdparty/amd_blobs/cezanne/CezanneGenericVbios.bin"
 
 config CONSOLE_UART_BASE_ADDRESS
@@ -326,11 +354,22 @@ config DISABLE_KEYBOARD_RESET_PIN
 	  functionality isn't disabled, configuring it as an output and driving
 	  it as 0 will cause a reset.
 
+config UART0_REMOVE_FROM_DSDT
+	bool "Do not add UART0 to ACPI DSDT"
+	default n
+	help
+	  Select this option to remove the UART0 device from the ACPI DSDT, so that the UART
+	  can be passed through to domU instead of being used by dom0 in the virtualization
+	  case.
+
 menu "PSP Configuration Options"
 
 config AMDFW_CONFIG_FILE
-	string
+	string "AMD PSP Firmware config file"
+	#default "src/soc/amd/cezanne/fw_renoir.cfg" if SOC_AMD_RENOIR
 	default "src/soc/amd/cezanne/fw.cfg"
+	help
+	  Specify the path/location of AMD PSP Firmware config file.
 
 config PSP_DISABLE_POSTCODES
 	bool "Disable PSP post codes"
@@ -378,6 +417,7 @@ config HAVE_PSP_WHITELIST_FILE
 config PSP_WHITELIST_FILE
 	string "Debug whitelist file path"
 	depends on HAVE_PSP_WHITELIST_FILE
+	#default "3rdparty/amd_blobs/renoir/PSP/wtl-rn.sbin" if SOC_AMD_RENOIR
 	default "3rdparty/amd_blobs/cezanne/PSP/wtl-czn.sbin"
 
 config PSP_SOFTFUSE_BITS
@@ -478,4 +518,11 @@ config RWB_REGION_ONLY
 
 endif # VBOOT_SLOTS_RW_AB && VBOOT_STARTS_BEFORE_BOOTBLOCK
 
-endif # SOC_AMD_CEZANNE
+config SERIRQ_CONTINUOUS_MODE
+	bool
+	default n
+	help
+	  Set this option to y for serial IRQ in continuous mode.
+	  Otherwise it is in quiet mode.
+
+endif # SOC_AMD_CEZANNE_BASE

@@ -8,6 +8,7 @@
 #include <static.h>
 #include <types.h>
 #include <variants.h>
+#include <common/powercap.h>
 
 #define TJ_MAX		105
 #define TCC(temp)	(TJ_MAX - temp)
@@ -19,7 +20,7 @@ void devtree_update(void)
 	struct soc_power_limits_config *soc_conf_4core =
 		&cfg->power_limits_config[ADL_N_041_6W_CORE];
 
-	struct device *nic_dev = pcidev_on_root(0x14, 3);
+	struct device *wifi_dev = pcidev_on_root(0x14, 3);
 	struct device *touchscreen_dev = pcidev_on_root(0x15, 2);
 	struct device *accelerometer_dev = pcidev_on_root(0x15, 0);
 	struct device *gna_dev = pcidev_on_root(0x08, 0);
@@ -51,11 +52,14 @@ void devtree_update(void)
 	soc_conf_4core->tdp_pl1_override = (soc_conf_4core->tdp_pl1_override * performance_scale) / 100;
 	soc_conf_4core->tdp_pl2_override = (soc_conf_4core->tdp_pl2_override * performance_scale) / 100;
 
+
+	/* Enable/Disable WiFi based on CMOS settings */
+	if (get_uint_option("wifi", 1) == 0)
+		wifi_dev->enabled = 0;
+
 	/* Enable/Disable Bluetooth based on CMOS settings */
-	if (get_uint_option("wireless", 1) == 0) {
+	if (get_uint_option("bluetooth", 1) == 0)
 		cfg->usb2_ports[9].enable = 0;
-		nic_dev->enabled = 0;
-	}
 
 	/* Enable/Disable Webcam/Camera based on CMOS settings */
 	if (get_uint_option("webcam", 1) == 0)
@@ -72,4 +76,8 @@ void devtree_update(void)
 	/* Enable/Disable GNA based on CMOS settings */
 	if (get_uint_option("gna", 0) == 0)
 		gna_dev->enabled = 0;
+
+	/* Enable/Disable Card Reader based on CMOS Settings */
+	if (get_uint_option("card_reader", 1) == 0)
+		cfg->usb2_ports[3].enable = 0;
 }

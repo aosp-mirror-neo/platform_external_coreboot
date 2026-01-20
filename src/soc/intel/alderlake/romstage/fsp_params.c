@@ -55,36 +55,55 @@ static uint8_t clk_src_to_fsp(enum pcie_rp_type type, int rp_number)
 		return CPU_PCIE_BASE + rp_number;
 }
 
-static void pcie_rp_init(FSP_M_CONFIG *m_cfg, uint32_t en_mask, enum pcie_rp_type type,
-			const struct pcie_rp_config *cfg, size_t cfg_count)
+static void configure_cpu_rp_speed(FSP_M_CONFIG *m_cfg,
+			const struct pcie_rp_config *cfg,
+			size_t index)
 {
-	size_t i;
+	static const char *const speeds[] = {"AUTO", "GEN1", "GEN2", "GEN3", "GEN4"};
+
+	m_cfg->CpuPcieRpPcieSpeed[index] =
+		pcie_speed_control_to_upd(get_uint_option("pciexp_speed",
+			cfg->pcie_rp_pcie_speed));
+	printk(BIOS_DEBUG, "CPU PCIe RP%zu: speed set to %s\n",
+		index + 1, speeds[m_cfg->CpuPcieRpPcieSpeed[index]]);
+}
+
+static void configure_rp_clocks(FSP_M_CONFIG *m_cfg, enum pcie_rp_type type,
+		const struct pcie_rp_config *rp_cfg, size_t index)
+{
 	/* bitmask to save the status of clkreq assignment */
 	static unsigned int clk_req_mapping = 0;
 
-	for (i = 0; i < cfg_count; i++) {
-		if (CONFIG(SOC_INTEL_COMPLIANCE_TEST_MODE)) {
-			m_cfg->PcieClkSrcUsage[i] = FSP_CLK_FREE_RUNNING;
-			continue;
+	if (CONFIG(SOC_INTEL_COMPLIANCE_TEST_MODE))
+		return;
+	if (rp_cfg->flags & PCIE_RP_CLK_SRC_UNUSED)
+		return;
+	if (!rp_cfg->flags && rp_cfg->clk_src == 0 && rp_cfg->clk_req == 0) {
+		printk(BIOS_WARNING, "Missing %s root port %zu clock structure definition\n",
+			type == PCIE_RP_CPU ? "CPU" : "PCH", index + 1);
+		return;
+	}
+	if (!(rp_cfg->flags & PCIE_RP_CLK_REQ_UNUSED)) {
+		if (clk_req_mapping & (BIT(rp_cfg->clk_req))) {
+			printk(BIOS_WARNING,
+				"Found overlapped clkreq assignment on clk req %u\n",
+				rp_cfg->clk_req);
 		}
+		m_cfg->PcieClkSrcClkReq[rp_cfg->clk_src] = rp_cfg->clk_req;
+		clk_req_mapping |= BIT(rp_cfg->clk_req);
+	}
+	m_cfg->PcieClkSrcUsage[rp_cfg->clk_src] = clk_src_to_fsp(type, index);
+}
+
+static void pcie_rp_init(FSP_M_CONFIG *m_cfg, uint32_t en_mask, enum pcie_rp_type type,
+		const struct pcie_rp_config *cfg, size_t cfg_count)
+{
+	for (size_t i = 0; i < cfg_count; i++) {
 		if (!(en_mask & BIT(i)))
 			continue;
-		if (cfg[i].flags & PCIE_RP_CLK_SRC_UNUSED)
-			continue;
-		if (!cfg[i].flags && cfg[i].clk_src == 0 && cfg[i].clk_req == 0) {
-			printk(BIOS_WARNING, "Missing root port clock structure definition\n");
-			continue;
-		}
-
-		if (!(cfg[i].flags & PCIE_RP_CLK_REQ_UNUSED)) {
-			if (clk_req_mapping & (1 << cfg[i].clk_req))
-				printk(BIOS_WARNING,
-				       "Found overlapped clkreq assignment on clk req %d\n",
-				       cfg[i].clk_req);
-			m_cfg->PcieClkSrcClkReq[cfg[i].clk_src] = cfg[i].clk_req;
-			clk_req_mapping |= 1 << cfg[i].clk_req;
-		}
-		m_cfg->PcieClkSrcUsage[cfg[i].clk_src] = clk_src_to_fsp(type, i);
+		configure_rp_clocks(m_cfg, type, &cfg[i], i);
+		if (type == PCIE_RP_CPU)
+			configure_cpu_rp_speed(m_cfg, &cfg[i], i);
 	}
 }
 
@@ -95,7 +114,9 @@ static void fill_fspm_pcie_rp_params(FSP_M_CONFIG *m_cfg,
 	unsigned int i;
 
 	for (i = 0; i < CONFIG_MAX_PCIE_CLOCK_SRC; i++) {
-		if (config->pcie_clk_config_flag[i] & PCIE_CLK_FREE_RUNNING)
+		if (CONFIG(SOC_INTEL_COMPLIANCE_TEST_MODE))
+			m_cfg->PcieClkSrcUsage[i] = FSP_CLK_FREE_RUNNING;
+		else if (config->pcie_clk_config_flag[i] & PCIE_CLK_FREE_RUNNING)
 			m_cfg->PcieClkSrcUsage[i] = FSP_CLK_FREE_RUNNING;
 		else if (config->pcie_clk_config_flag[i] & PCIE_CLK_LAN)
 			m_cfg->PcieClkSrcUsage[i] = FSP_CLK_LAN;
@@ -131,7 +152,7 @@ static void fill_fspm_igd_params(FSP_M_CONFIG *m_cfg,
 		[DDI_PORT_3] = {&m_cfg->DdiPort3Ddc, &m_cfg->DdiPort3Hpd},
 		[DDI_PORT_4] = {&m_cfg->DdiPort4Ddc, &m_cfg->DdiPort4Hpd},
 	};
-	m_cfg->InternalGfx = !CONFIG(SOC_INTEL_DISABLE_IGD) && is_devfn_enabled(SA_DEVFN_IGD);
+	m_cfg->InternalGfx = get_uint_option("igd_enabled", !CONFIG(SOC_INTEL_DISABLE_IGD)) && is_devfn_enabled(SA_DEVFN_IGD);
 	if (m_cfg->InternalGfx) {
 		/* IGD is enabled, set IGD stolen size to 60MB. */
 		m_cfg->IgdDvmt50PreAlloc = get_uint_option("igd_dvmt_prealloc", IGD_SM_60MB);

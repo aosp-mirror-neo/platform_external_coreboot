@@ -33,9 +33,9 @@ void lb_efi_fw_info(struct lb_header *header);
 /* Adds LB_TAG_CAPSULE table entries. */
 void lb_efi_capsules(struct lb_header *header);
 
-/* Define this function to fill in the frame buffer returning 0 on success and
-   < 0 on error. */
-int fill_lb_framebuffer(struct lb_framebuffer *framebuffer);
+/* Define this function to get the frame buffer returning lb_framebuffer object
+   on success and NULL on error. */
+const struct lb_framebuffer *get_lb_framebuffer(void);
 
 /* Allow arch to add records. */
 void lb_arch_add_records(struct lb_header *header);
@@ -52,6 +52,9 @@ struct lb_record *lb_new_record(struct lb_header *header);
 
 /* Add VBOOT VBNV offsets. */
 void lb_table_add_vbnv_cmos(struct lb_header *header);
+
+/* Add Boot Mode information */
+void lb_add_boot_mode(struct lb_header *header);
 
 /* Define this in mainboard.c to add board specific CFR entries */
 void mb_cfr_setup_menu(struct lb_cfr *cfr_root);
