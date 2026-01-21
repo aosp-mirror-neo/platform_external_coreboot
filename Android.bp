@@ -76,7 +76,7 @@ cc_defaults {
     name: "coreboot-tools-with-vboot-defaults",
     defaults: ["coreboot-tools-defaults"],
     include_dirs: ["external/vboot_reference/host/lib/include"],
-    static_libs: ["libvboot_host"],
+    shared_libs: ["libvboot_host"],
 }
 
 genrule {
